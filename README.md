@@ -1,5 +1,9 @@
 # 100Games Plan · 100游戏计划
 
+<p align="center">
+  <img src="docs/screenshots/promo.png" alt="100Games Plan 宣传图" width="100%" />
+</p>
+
 [下载最新版 APK](https://github.com/S1LENCE-D/100games-plan/releases/latest)
 
 100Games Plan 是一款使用 Kotlin + Jetpack Compose + Material 3 构建的原生 Android 小游戏合集。大部分游戏使用 Compose Canvas、手势与协程实现；「吃掉小猫猫」是本地打包的离线网页音游，通过 WebView 集成并由原生层读取网页得分与 CPS。
