@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 启动窗口与软化的浅色主背景。 -->
+    <color name="app_window_background">#F0EBF2</color>
+    <color name="splash_background">#6750A4</color>
+    <color name="ic_launcher_background">#47509F</color>
+</resources>
