@@ -160,11 +160,27 @@ fun NearbyRouteScreen(
             )
         },
     ) { innerPadding ->
+        val scrollLobby = when (uiState.stage) {
+            NearbyStage.IDLE,
+            NearbyStage.HOSTING,
+            NearbyStage.SCANNING,
+            NearbyStage.CONNECTING,
+            NearbyStage.CONNECTED,
+            -> true
+            else -> false
+        }
+        val lobbyScrollState = rememberScrollState()
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
+                .then(
+                    if (scrollLobby) {
+                        Modifier.verticalScroll(lobbyScrollState)
+                    } else {
+                        Modifier
+                    },
+                )
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
