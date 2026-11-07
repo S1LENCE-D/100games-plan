@@ -104,10 +104,7 @@ fun BallBattleRouteScreen(
                 GameStatusItem("剩余点数", state.remainingPoints.toString()),
             )
         } else {
-            listOf(
-                GameStatusItem("我方生命", state.snapshot?.player?.hp?.toString() ?: "0"),
-                GameStatusItem("对手生命", state.snapshot?.opponent?.hp?.toString() ?: "0"),
-            )
+            emptyList()
         },
         onHelpRequest = {
             if (state.phase == BallBattlePhase.BATTLE && !state.isPaused) {
@@ -168,12 +165,7 @@ fun BallBattleRouteScreen(
             onExit = onExit,
             extraActionLabel = "调整加点",
             onExtraAction = viewModel::openBuild,
-            details = listOf(
-                winnerText,
-                "我方剩余生命 ${snapshot?.player?.hp ?: 0}/${snapshot?.player?.maxHp ?: 0}",
-                "造成伤害 ${snapshot?.playerDamageDealt ?: 0}",
-                "AI 加点：${buildSummary(state.opponentBuild)}",
-            ),
+            details = listOf(winnerText),
         )
     }
 }
@@ -396,7 +388,7 @@ private fun BallBattleContent(state: BallBattleUiState) {
             Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = if (state.winner == null) {
-                    "自动碰撞中 · 双方碰撞同时造成伤害"
+                    "自动碰撞中"
                 } else {
                     when (state.winner) {
                         1 -> "你赢了"
@@ -410,29 +402,6 @@ private fun BallBattleContent(state: BallBattleUiState) {
                 } else {
                     MaterialTheme.colorScheme.primary
                 },
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "AI 加点：${buildSummary(state.opponentBuild)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                text = "碰撞加速 x${"%.2f".format(snapshot.playerSpeedBoost)} / x${"%.2f".format(snapshot.opponentSpeedBoost)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "金色数字为暴击伤害，双方碰撞都会显示伤害数字",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -609,10 +578,4 @@ private fun BallArena(
     }
 }
 
-private fun buildSummary(build: BallBuild): String = listOf(
-    "力${build.power}",
-    "生${build.vitality}",
-    "速${build.agility}",
-    "体${build.size}",
-    "暴${build.luck}",
-).joinToString(" ")
+

@@ -143,6 +143,26 @@ fun MinesweeperRouteScreen(
         }
     }
 
+    if (!uiState.hasStarted) {
+        GameReadyOverlay(
+            showTutorial = tutorialSeen == false,
+            title = "扫雷",
+            description = "点击方格翻开，长按插旗；第一次翻格及周围八格保证安全。",
+            onStart = {
+                viewModel.markTutorialSeen()
+                viewModel.startGame()
+            },
+            onDismissRequest = onExit,
+        ) {
+            GameSegmentedOptions(
+                options = MinesweeperDifficulty.entries,
+                selected = uiState.difficulty,
+                label = { difficulty -> difficulty.label },
+                onSelect = viewModel::selectDifficulty,
+            )
+        }
+    }
+
     if (showHelp) {
         GameHelpSheet("扫雷", MinesweeperHelpLines, onDismiss = { showHelp = false })
     }

@@ -42,6 +42,7 @@ fun GameGlyph(
 ) {
     val container = MaterialTheme.colorScheme.primaryContainer
     val ink = MaterialTheme.colorScheme.onPrimaryContainer
+    val accent = MaterialTheme.colorScheme.tertiary
     val dinoSprite = if (gameId == GameId.DINO) {
         ImageBitmap.imageResource(R.drawable.dino_sprite_sheet)
     } else {
@@ -61,6 +62,7 @@ fun GameGlyph(
             drawUnifiedGlyph(
                 gameId = gameId,
                 ink = ink,
+                accent = accent,
                 container = container,
                 dinoSprite = dinoSprite,
             )
@@ -71,6 +73,7 @@ fun GameGlyph(
 private fun DrawScope.drawUnifiedGlyph(
     gameId: GameId,
     ink: androidx.compose.ui.graphics.Color,
+    accent: androidx.compose.ui.graphics.Color,
     container: androidx.compose.ui.graphics.Color,
     dinoSprite: ImageBitmap?,
 ) {
@@ -215,12 +218,8 @@ private fun DrawScope.drawUnifiedGlyph(
         }
 
         GameId.BALL_BATTLE -> {
-            drawCircle(color = ink, radius = 4.7f * unit, center = p(7.2f, 12f))
-            drawCircle(
-                color = ink.copy(alpha = 0.62f),
-                radius = 4.1f * unit,
-                center = p(16.8f, 12f),
-            )
+            drawCircle(color = accent, radius = 6.2f * unit, center = p(8.7f, 12.8f))
+            drawCircle(color = ink, radius = 3.6f * unit, center = p(17.3f, 8.8f))
             line(1.5f, 7f, 5f, 9f)
             line(1.5f, 17f, 5f, 15f)
             line(22.5f, 7f, 19f, 9f)

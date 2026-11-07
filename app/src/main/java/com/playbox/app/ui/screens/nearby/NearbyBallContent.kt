@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.sp
 import com.playbox.app.games.ballbattle.BALL_TOTAL_SKILL_POINTS
 import com.playbox.app.games.ballbattle.BallAttribute
 import com.playbox.app.games.ballbattle.BallBattleSnapshot
-import com.playbox.app.games.ballbattle.BallBuild
 import com.playbox.app.games.ballbattle.BallStats
 import com.playbox.app.games.nearby.NearbyUiState
 import com.playbox.app.ui.components.SoftCard
@@ -323,21 +322,6 @@ private fun BallLobbyBattle(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "好友加点：${nearbyBuildSummary(state.ball.remoteBuild)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                text = "碰撞加速 x${"%.2f".format(snapshot.playerSpeedBoost)} / x${"%.2f".format(snapshot.opponentSpeedBoost)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
             Spacer(modifier = Modifier.height(8.dp))
             if (ball.isFinished) {
                 Button(onClick = onLeave) { Text(text = "返回房间") }
@@ -485,7 +469,3 @@ private fun nearbyBallEffect(attribute: BallAttribute, stats: BallStats): String
     BallAttribute.SIZE -> "半径 ${stats.radius.roundToInt()} · 质量 ${"%.1f".format(stats.mass)}"
     BallAttribute.LUCK -> "暴击 ${"%.0f%%".format(stats.critChance * 100)}"
 }
-
-private fun nearbyBuildSummary(build: BallBuild?): String = build?.let {
-    "力${it.power} 生${it.vitality} 速${it.agility} 体${it.size} 暴${it.luck}"
-} ?: "等待好友"
