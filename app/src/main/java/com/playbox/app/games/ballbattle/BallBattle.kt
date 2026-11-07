@@ -12,7 +12,7 @@ import kotlin.random.Random
 
 const val BALL_TOTAL_SKILL_POINTS = 12
 private const val BASE_BALL_RADIUS = 30f
-private const val BASE_BALL_SPEED = 220f
+private const val BASE_BALL_SPEED = 270f
 
 enum class BallAttribute(
     val label: String,
@@ -151,7 +151,7 @@ class BallBattleEngine(
     val opponentBuild: BallBuild,
     private val random: Random = Random.Default,
     val arenaWidth: Float = 1000f,
-    val arenaHeight: Float = 600f,
+    val arenaHeight: Float = 1000f,
 ) {
     private val playerStats = playerBuild.stats
     private val opponentStats = opponentBuild.stats

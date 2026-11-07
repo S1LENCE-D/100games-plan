@@ -77,7 +77,7 @@ class BallBattleFeedbackTest {
 
     @Test
     fun `base ball speed is raised`() {
-        assertTrue(BallBuild().stats.moveSpeed >= 175f)
+        assertTrue(BallBuild().stats.moveSpeed >= 270f)
     }
 
     @Test
@@ -111,5 +111,18 @@ class BallBattleSizeSpeedTest {
         val radiusRatio = larger.radius / base.radius
         val speedRatio = larger.moveSpeed / base.moveSpeed
         assertEquals(radiusRatio, speedRatio, 0.001f)
+    }
+}
+
+class BallBattleArenaTest {
+    @Test
+    fun `default arena is square`() {
+        val engine = BallBattleEngine(
+            playerBuild = BallBuild(),
+            opponentBuild = BallBuild(),
+            random = Random(13),
+        )
+        val snapshot = engine.snapshot()
+        assertEquals(snapshot.arenaWidth, snapshot.arenaHeight, 0.001f)
     }
 }

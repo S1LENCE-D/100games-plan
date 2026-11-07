@@ -261,9 +261,13 @@ private fun BallLobbyBattle(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        val contentWidth = minOf(maxWidth, 760.dp)
+        val arenaSize = minOf(
+            maxWidth,
+            760.dp,
+            (maxHeight - 120.dp).coerceAtLeast(180.dp),
+        )
         Column(
-            modifier = Modifier.width(contentWidth),
+            modifier = Modifier.width(arenaSize),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(
@@ -286,11 +290,10 @@ private fun BallLobbyBattle(
                 )
             }
             Spacer(modifier = Modifier.height(10.dp))
-            val arenaHeight = contentWidth * 0.60f
             GameBoardFrame(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(arenaHeight),
+                    .height(arenaSize),
                 contentPadding = 0.dp,
                 clipContent = true,
             ) {
