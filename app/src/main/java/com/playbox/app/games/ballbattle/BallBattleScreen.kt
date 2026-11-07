@@ -291,7 +291,7 @@ private fun BallBuildContent(
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "单机对手会随机分配 12 点；联机自定义球对战将在下一阶段接入。",
+                text = "单机对手随机分配 12 点；联机模式可在附近联机中与好友各自加点对战。",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

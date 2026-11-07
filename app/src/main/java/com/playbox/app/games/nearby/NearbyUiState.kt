@@ -1,6 +1,8 @@
 package com.playbox.app.games.nearby
 
 import androidx.compose.runtime.Immutable
+import com.playbox.app.games.ballbattle.BallBattleSnapshot
+import com.playbox.app.games.ballbattle.BallBuild
 
 enum class NearbyStage {
     IDLE,
@@ -12,6 +14,7 @@ enum class NearbyStage {
     ROULETTE,
     TIC_TAC_TOE,
     BOMB,
+    BALL,
 }
 
 @Immutable
@@ -58,6 +61,17 @@ data class TttUiState(
 )
 
 @Immutable
+data class NearbyBallUiState(
+    val build: BallBuild = BallBuild(),
+    val remoteBuild: BallBuild? = null,
+    val localReady: Boolean = false,
+    val remoteReady: Boolean = false,
+    val snapshot: BallBattleSnapshot? = null,
+    val winner: Int? = null,
+    val isFinished: Boolean = false,
+)
+
+@Immutable
 data class NearbyUiState(
     val stage: NearbyStage = NearbyStage.IDLE,
     val peers: List<NearbyPeer> = emptyList(),
@@ -74,4 +88,5 @@ data class NearbyUiState(
     val roulette: RouletteUiState = RouletteUiState(),
     val ttt: TttUiState = TttUiState(),
     val bomb: BombUiState = BombUiState(),
+    val ball: NearbyBallUiState = NearbyBallUiState(),
 )

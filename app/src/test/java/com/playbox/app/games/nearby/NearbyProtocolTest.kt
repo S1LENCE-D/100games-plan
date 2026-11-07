@@ -110,3 +110,10 @@ class NearbyTttTest {
         assertEquals(0, match.winner)
     }
 }
+
+class NearbyBallProtocolTest {
+    @Test
+    fun `ball game wire round trips`() {
+        assertEquals(NearbyGame.BALL, NearbyGame.fromWire("ball"))
+    }
+}

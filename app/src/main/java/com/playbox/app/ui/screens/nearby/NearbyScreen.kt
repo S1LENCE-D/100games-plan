@@ -65,6 +65,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.playbox.app.AppContainer
 import com.playbox.app.R
+import com.playbox.app.games.ballbattle.BallAttribute
 import com.playbox.app.games.nearby.NearbyGame
 import com.playbox.app.games.nearby.NearbyPeer
 import com.playbox.app.games.nearby.NearbyPlayer
@@ -225,6 +226,11 @@ fun NearbyRouteScreen(
                     onRematchRoulette = viewModel::rematchRoulette,
                     onBombGuess = viewModel::submitBombGuess,
                     onBombRematch = viewModel::rematchBomb,
+                    onAddBall = viewModel::addBallPoint,
+                    onRemoveBall = viewModel::removeBallPoint,
+                    onRandomBall = viewModel::randomizeBallBuild,
+                    onReadyBall = viewModel::readyBall,
+                    onLeaveBall = viewModel::leaveBallBattle,
                 )
             }
 
@@ -250,6 +256,11 @@ private fun NearbyContent(
     onRematchRoulette: () -> Unit,
     onBombGuess: (Int) -> Unit,
     onBombRematch: () -> Unit,
+    onAddBall: (BallAttribute) -> Unit,
+    onRemoveBall: (BallAttribute) -> Unit,
+    onRandomBall: () -> Unit,
+    onReadyBall: () -> Unit,
+    onLeaveBall: () -> Unit,
     onRoomNameChange: (String) -> Unit,
 ) {
     when (state.stage) {
@@ -302,6 +313,15 @@ private fun NearbyContent(
             state = state,
             onGuess = onBombGuess,
             onRematch = onBombRematch,
+            onDisconnect = onDisconnect,
+        )
+        NearbyStage.BALL -> NearbyBallContent(
+            state = state,
+            onAdd = onAddBall,
+            onRemove = onRemoveBall,
+            onRandom = onRandomBall,
+            onReady = onReadyBall,
+            onLeave = onLeaveBall,
             onDisconnect = onDisconnect,
         )
     }
@@ -465,6 +485,13 @@ private fun ConnectedLobby(
             title = "双人井字棋",
             description = "轮流落子，先连成三子者获胜。",
             onClick = { onChooseGame(NearbyGame.TIC_TAC_TOE) },
+            centered = true,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        GameEntryCard(
+            title = "小球对对碰",
+            description = "各自加点，两个自定义球碰撞决胜负。",
+            onClick = { onChooseGame(NearbyGame.BALL) },
             centered = true,
         )
         Spacer(modifier = Modifier.height(12.dp))

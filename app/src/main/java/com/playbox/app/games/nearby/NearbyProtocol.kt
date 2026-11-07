@@ -15,6 +15,7 @@ object NearbyProtocol {
     const val GAME_ROULETTE = "rou"
     const val GAME_TTT = "ttt"
     const val GAME_BOMB = "bomb"
+    const val GAME_BALL = "ball"
 
     fun encodeRoomName(name: String): ByteArray {
         val trimmed = name.trim().ifBlank { DEFAULT_ROOM_NAME }
@@ -36,6 +37,7 @@ enum class NearbyGame(val wire: String) {
     ROULETTE(NearbyProtocol.GAME_ROULETTE),
     TIC_TAC_TOE(NearbyProtocol.GAME_TTT),
     BOMB(NearbyProtocol.GAME_BOMB),
+    BALL(NearbyProtocol.GAME_BALL),
     ;
 
     companion object {

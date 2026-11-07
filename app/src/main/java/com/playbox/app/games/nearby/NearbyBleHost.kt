@@ -15,6 +15,7 @@ import android.bluetooth.le.AdvertiseSettings
 import android.content.Context
 import android.os.Build
 import android.os.ParcelUuid
+import java.util.ArrayDeque
 
 /**
  * 一个小型 BLE GATT 房主，可同时接受多个客人连接。
@@ -37,6 +38,8 @@ class NearbyBleHost(
     private var advertiser: android.bluetooth.le.BluetoothLeAdvertiser? = null
     private val devices = linkedMapOf<String, BluetoothDevice>()
     private val notifiedAddresses = mutableSetOf<String>()
+    private val outgoing = mutableMapOf<String, ArrayDeque<String>>()
+    private val sending = mutableSetOf<String>()
 
     fun start(): Boolean {
         val adapter = adapter ?: run {
@@ -117,26 +120,46 @@ class NearbyBleHost(
         return delivered
     }
 
+    @Synchronized
     fun sendTo(address: String, message: String): Boolean {
-        val server = server ?: return false
-        val device = devices[address] ?: return false
-        val char = characteristic ?: return false
+        if (devices[address] == null || characteristic == null) return false
         if (address !in notifiedAddresses) return false
-        return runCatching {
+        outgoing.getOrPut(address) { ArrayDeque() }.addLast(message)
+        pumpLocked(address)
+        return true
+    }
+
+    @Synchronized
+    private fun pumpLocked(address: String) {
+        if (address in sending) return
+        val queue = outgoing[address] ?: return
+        val message = queue.pollFirst() ?: return
+        val server = server ?: return
+        val device = devices[address] ?: return
+        val char = characteristic ?: return
+        sending.add(address)
+        val started = runCatching {
             val data = message.toByteArray(Charsets.UTF_8)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                server.notifyCharacteristicChanged(device, char, false, data)
+                server.notifyCharacteristicChanged(device, char, false, data) ==
+                    android.bluetooth.BluetoothStatusCodes.SUCCESS
             } else {
                 @Suppress("DEPRECATION")
                 char.value = data
                 @Suppress("DEPRECATION")
                 server.notifyCharacteristicChanged(device, char, false)
             }
-            true
-        }.getOrElse {
-            onError("蓝牙发送失败")
-            false
+        }.getOrElse { false }
+        if (!started) {
+            sending.remove(address)
+            onError("蓝牙发送繁忙，正在重试")
         }
+    }
+
+    @Synchronized
+    private fun clearQueues() {
+        outgoing.clear()
+        sending.clear()
     }
 
     fun disconnect(address: String) {
@@ -144,6 +167,8 @@ class NearbyBleHost(
         runCatching { server?.cancelConnection(device) }
         notifiedAddresses.remove(address)
         devices.remove(address)
+        outgoing.remove(address)
+        sending.remove(address)
     }
 
     fun stop() {
@@ -155,6 +180,7 @@ class NearbyBleHost(
         characteristic = null
         devices.clear()
         notifiedAddresses.clear()
+        clearQueues()
     }
 
     private val advertiseCallback = object : AdvertiseCallback() {
@@ -169,8 +195,20 @@ class NearbyBleHost(
                 devices[device.address] = device
             } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
                 devices.remove(device.address)
+                outgoing.remove(device.address)
+                sending.remove(device.address)
                 val wasNotified = notifiedAddresses.remove(device.address)
                 if (wasNotified) onDisconnected(device.address)
+            }
+        }
+
+        override fun onNotificationSent(device: BluetoothDevice, status: Int) {
+            synchronized(this@NearbyBleHost) {
+                sending.remove(device.address)
+                if (status != BluetoothGatt.GATT_SUCCESS) {
+                    onError("蓝牙通知发送失败，正在重试")
+                }
+                pumpLocked(device.address)
             }
         }
 

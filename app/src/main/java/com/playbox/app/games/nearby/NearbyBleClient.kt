@@ -16,6 +16,7 @@ import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.os.Build
 import android.os.ParcelUuid
+import java.util.ArrayDeque
 
 @SuppressLint("MissingPermission")
 class NearbyBleClient(
@@ -33,6 +34,8 @@ class NearbyBleClient(
     private var characteristic: BluetoothGattCharacteristic? = null
     private var scanning = false
     private val peers = linkedMapOf<String, NearbyPeer>()
+    private val writeQueue = ArrayDeque<String>()
+    private var writeInFlight = false
 
     fun startScan(): Boolean {
         val adapter = adapter ?: run {
@@ -57,6 +60,9 @@ class NearbyBleClient(
         )
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setMatchMode(1) // SCAN_MATCH_MODE_AGGRESSIVE
+            .setNumOfMatches(ScanSettings.MATCH_NUM_MAX_ADVERTISEMENT)
+            .setReportDelay(0)
             .build()
         return runCatching {
             scanner.startScan(filters, settings, scanCallback)
@@ -76,14 +82,25 @@ class NearbyBleClient(
             onError("无法连接该设备")
             return
         }
+        clearWriteQueue()
         gatt?.close()
         gatt = device.connectGatt(appContext, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
     }
 
-    fun send(message: String): Boolean {
-        val gatt = gatt ?: return false
-        val char = characteristic ?: return false
-        return runCatching {
+    fun send(message: String): Boolean = synchronized(this) {
+        if (gatt == null || characteristic == null) return false
+        writeQueue.addLast(message)
+        pumpWriteLocked()
+        true
+    }
+
+    private fun pumpWriteLocked() {
+        if (writeInFlight) return
+        val message = writeQueue.pollFirst() ?: return
+        val gatt = gatt ?: run { writeQueue.clear(); return }
+        val char = characteristic ?: run { writeQueue.clear(); return }
+        writeInFlight = true
+        val started = runCatching {
             val data = message.toByteArray(Charsets.UTF_8)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 gatt.writeCharacteristic(
@@ -103,6 +120,15 @@ class NearbyBleClient(
             onError("蓝牙发送失败")
             false
         }
+        if (!started) {
+            writeInFlight = false
+            onError("蓝牙发送繁忙，正在重试")
+        }
+    }
+
+    private fun clearWriteQueue() = synchronized(this) {
+        writeQueue.clear()
+        writeInFlight = false
     }
 
     fun stopScan() {
@@ -112,6 +138,7 @@ class NearbyBleClient(
     }
 
     fun close() {
+        clearWriteQueue()
         stopScan()
         runCatching { gatt?.disconnect() }
         runCatching { gatt?.close() }
@@ -149,7 +176,9 @@ class NearbyBleClient(
             if (newState == BluetoothGatt.STATE_CONNECTED) {
                 gatt.discoverServices()
             } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
+                clearWriteQueue()
                 characteristic = null
+                runCatching { gatt.close() }
                 onDisconnected()
             }
         }
@@ -170,6 +199,8 @@ class NearbyBleClient(
                     return
                 }
             characteristic = char
+            runCatching { gatt.requestMtu(128) }
+            runCatching { gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH) }
             gatt.setCharacteristicNotification(char, true)
             val descriptor = char.getDescriptor(NearbyProtocol.CCCD_UUID)
             if (descriptor == null) {
@@ -192,7 +223,24 @@ class NearbyBleClient(
             status: Int,
         ) {
             if (descriptor.uuid == NearbyProtocol.CCCD_UUID && status == BluetoothGatt.GATT_SUCCESS) {
+                runCatching {
+                    gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+                }
                 onConnected(peerName(gatt.device))
+            }
+        }
+
+        override fun onCharacteristicWrite(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            status: Int,
+        ) {
+            synchronized(this@NearbyBleClient) {
+                writeInFlight = false
+                if (status != BluetoothGatt.GATT_SUCCESS) {
+                    onError("蓝牙写入失败，正在重试")
+                }
+                pumpWriteLocked()
             }
         }
 

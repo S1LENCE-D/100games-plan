@@ -7,8 +7,16 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.playbox.app.domain.repository.SettingsRepository
+import com.playbox.app.games.ballbattle.BALL_TOTAL_SKILL_POINTS
+import com.playbox.app.games.ballbattle.BallAttribute
+import com.playbox.app.games.ballbattle.BallBattleEngine
+import com.playbox.app.games.ballbattle.BallBuild
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +36,13 @@ class NearbyViewModel(
     private val hostGuests = linkedMapOf<String, String>()
     private var rouletteEngine: RouletteEngine? = null
     private var tttMatch: TttMatch? = null
+    private var ballEngine: BallBattleEngine? = null
+    private var ballLoopJob: Job? = null
+    private var ballRemoteBuild: BallBuild? = null
+    private var ballSeed: Int? = null
+    private val reliableCounter = AtomicInteger(0)
+    private val pendingReliable = ConcurrentHashMap<Int, PendingReliable>()
+    private val seenReliable = ConcurrentHashMap.newKeySet<Int>()
     private var closing = false
     private var roomLocked = false
     private var roomNameLoaded = false
@@ -168,6 +183,7 @@ class NearbyViewModel(
             NearbyGame.ROULETTE -> NearbyStage.ROULETTE
             NearbyGame.TIC_TAC_TOE -> NearbyStage.TIC_TAC_TOE
             NearbyGame.BOMB -> NearbyStage.BOMB
+            NearbyGame.BALL -> NearbyStage.BALL
         }
         if (state.isHost) lockRoomForGame()
         _uiState.update {
@@ -178,14 +194,16 @@ class NearbyViewModel(
                 roulette = RouletteUiState(),
                 ttt = TttUiState(),
                 bomb = BombUiState(),
+                ball = NearbyBallUiState(),
                 error = null,
             )
         }
-        send("G|${game.wire}")
+        sendReliable("G|${game.wire}")
         when (game) {
             NearbyGame.TIC_TAC_TOE -> startTttMatch()
             NearbyGame.ROULETTE -> if (state.isHost) startRouletteHost()
             NearbyGame.BOMB -> startBombHost()
+            NearbyGame.BALL -> Unit
             NearbyGame.RPS -> Unit
         }
     }
@@ -233,7 +251,7 @@ class NearbyViewModel(
             hostPull()
         } else {
             if (roulette.turn != NearbyPlayer.GUEST) return
-            if (send("R|P")) {
+            if (sendReliable("R|P")) {
                 _uiState.update { it.copy(roulette = it.roulette.copy(waiting = true)) }
             }
         }
@@ -263,6 +281,195 @@ class NearbyViewModel(
         val state = _uiState.value
         if (state.stage != NearbyStage.BOMB || !state.bomb.isOver || !state.isHost) return
         startBombHost()
+    }
+
+    fun addBallPoint(attribute: BallAttribute) {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.BALL || state.ball.localReady) return
+        val next = state.ball.build.withPoint(attribute, 1)
+        if (next == state.ball.build) return
+        _uiState.update { it.copy(ball = it.ball.copy(build = next)) }
+    }
+
+    fun removeBallPoint(attribute: BallAttribute) {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.BALL || state.ball.localReady) return
+        val next = state.ball.build.withPoint(attribute, -1)
+        if (next == state.ball.build) return
+        _uiState.update { it.copy(ball = it.ball.copy(build = next)) }
+    }
+
+    fun randomizeBallBuild() {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.BALL || state.ball.localReady) return
+        _uiState.update {
+            it.copy(ball = it.ball.copy(build = BallBuild.random(Random.Default)))
+        }
+    }
+
+    fun readyBall() {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.BALL || state.ball.localReady) return
+        if (state.ball.build.remaining != 0) return
+        _uiState.update { it.copy(ball = it.ball.copy(localReady = true)) }
+        sendReliable("K|${encodeBallBuild(state.ball.build)}")
+        if (state.isHost) tryStartBallBattle()
+    }
+
+    fun leaveBallBattle() {
+        if (_uiState.value.stage == NearbyStage.BALL) sendReliable("X")
+        stopBallBattle()
+        ballRemoteBuild = null
+        ballSeed = null
+        _uiState.update {
+            it.copy(
+                stage = NearbyStage.CONNECTED,
+                game = null,
+                ball = NearbyBallUiState(),
+            )
+        }
+    }
+
+    private fun tryStartBallBattle() {
+        val state = _uiState.value
+        if (!state.isHost || !state.ball.localReady || !state.ball.remoteReady) return
+        val remote = ballRemoteBuild ?: return
+        if (ballSeed != null) return
+        val seed = random.nextInt(1, Int.MAX_VALUE)
+        ballSeed = seed
+        sendReliable("L|$seed")
+        startBallBattle(seed)
+    }
+
+    private fun startBallBattle(seed: Int) {
+        val state = _uiState.value
+        val remote = ballRemoteBuild ?: return
+        val local = state.ball.build
+        val hostBuild = if (state.isHost) local else remote
+        val guestBuild = if (state.isHost) remote else local
+        val engine = BallBattleEngine(
+            playerBuild = hostBuild,
+            opponentBuild = guestBuild,
+            random = Random(seed),
+        )
+        ballEngine = engine
+        ballLoopJob?.cancel()
+        _uiState.update {
+            it.copy(
+                ball = it.ball.copy(
+                    snapshot = engine.snapshot(),
+                    winner = null,
+                    isFinished = false,
+                ),
+            )
+        }
+        ballLoopJob = viewModelScope.launch {
+            while (isActive) {
+                delay(16)
+                if (engine.isFinished) break
+                engine.step(16)
+                val snapshot = engine.snapshot()
+                _uiState.update {
+                    it.copy(
+                        ball = it.ball.copy(
+                            snapshot = snapshot,
+                            winner = snapshot.winner,
+                            isFinished = snapshot.isFinished,
+                        ),
+                    )
+                }
+                if (engine.isFinished) {
+                    finishBallBattle()
+                    break
+                }
+            }
+        }
+    }
+
+    private fun finishBallBattle() {
+        val engine = ballEngine ?: return
+        val snapshot = engine.snapshot()
+        _uiState.update {
+            it.copy(
+                ball = it.ball.copy(
+                    snapshot = snapshot,
+                    winner = snapshot.winner,
+                    isFinished = true,
+                ),
+            )
+        }
+        ballLoopJob = null
+        if (_uiState.value.isHost) {
+            sendReliable(
+                "J|${snapshot.winner ?: 0}|${snapshot.player.hp}|${snapshot.opponent.hp}",
+            )
+        }
+    }
+
+    private fun handleBallBuild(parts: List<String>) {
+        if (_uiState.value.stage != NearbyStage.BALL) return
+        val code = parts.getOrNull(1) ?: return
+        val build = decodeBallBuild(code) ?: return
+        ballRemoteBuild = build
+        _uiState.update {
+            it.copy(
+                ball = it.ball.copy(
+                    remoteBuild = build,
+                    remoteReady = true,
+                ),
+            )
+        }
+        if (_uiState.value.isHost) {
+            tryStartBallBattle()
+        } else if (ballSeed != null) {
+            startBallBattle(ballSeed!!)
+        }
+    }
+
+    private fun handleBallSeed(parts: List<String>) {
+        if (_uiState.value.stage != NearbyStage.BALL) return
+        if (_uiState.value.isHost) return
+        val seed = parts.getOrNull(1)?.toIntOrNull() ?: return
+        ballSeed = seed
+        if (ballRemoteBuild != null) startBallBattle(seed)
+    }
+
+    private fun handleBallResult(parts: List<String>) {
+        if (_uiState.value.stage != NearbyStage.BALL) return
+        if (_uiState.value.isHost) return
+        val winner = parts.getOrNull(1)?.toIntOrNull() ?: return
+        ballLoopJob?.cancel()
+        ballLoopJob = null
+        _uiState.update {
+            it.copy(
+                ball = it.ball.copy(
+                    winner = winner,
+                    isFinished = true,
+                ),
+            )
+        }
+    }
+
+    private fun encodeBallBuild(build: BallBuild): String = buildList {
+        add(build.power)
+        add(build.vitality)
+        add(build.agility)
+        add(build.size)
+        add(build.luck)
+    }.joinToString("") { it.toString(36) }
+
+    private fun decodeBallBuild(code: String): BallBuild? {
+        if (code.length != 5) return null
+        val values = code.map { it.digitToIntOrNull(36) ?: return null }
+        if (values.any { it !in 0..BALL_TOTAL_SKILL_POINTS }) return null
+        if (values.sum() > BALL_TOTAL_SKILL_POINTS) return null
+        return BallBuild(
+            power = values[0],
+            vitality = values[1],
+            agility = values[2],
+            size = values[3],
+            luck = values[4],
+        )
     }
 
     private fun onHostPeerConnected(name: String, address: String) {
@@ -384,7 +591,7 @@ class NearbyViewModel(
                 roulette = RouletteUiState(turn = NearbyPlayer.HOST),
             )
         }
-        send("R|START|H")
+        sendReliable("R|START|H")
     }
 
     private fun hostPull() {
@@ -395,7 +602,7 @@ class NearbyViewModel(
         } else {
             "R|S|${engine.turn.wire}|${engine.chamber}"
         }
-        send(message)
+        sendReliable(message)
         _uiState.update {
             it.copy(
                 roulette = RouletteUiState(
@@ -477,6 +684,25 @@ class NearbyViewModel(
 
     private fun handleMessage(message: String, fromAddress: String?) {
         if (message.isBlank() || closing) return
+        val envelope = message.split('|', limit = 3)
+        when (envelope.firstOrNull()) {
+            "A" -> {
+                envelope.getOrNull(1)?.toIntOrNull()?.let(::acknowledgeReliable)
+                return
+            }
+            "M" -> {
+                val seq = envelope.getOrNull(1)?.toIntOrNull() ?: return
+                if (seenReliable.add(seq)) {
+                    envelope.getOrNull(2)?.let { processMessage(it, fromAddress) }
+                }
+                sendRaw("A|$seq")
+                return
+            }
+        }
+        processMessage(message, fromAddress)
+    }
+
+    private fun processMessage(message: String, fromAddress: String?) {
         val parts = message.split('|')
         when (parts.firstOrNull()) {
             "H" -> Unit
@@ -508,6 +734,15 @@ class NearbyViewModel(
                             error = null,
                         )
                     }
+                } else if (_uiState.value.game == NearbyGame.BALL) {
+                    resetGameState()
+                    _uiState.update {
+                        it.copy(
+                            stage = NearbyStage.CONNECTED,
+                            game = null,
+                            error = null,
+                        )
+                    }
                 }
             }
             "P" -> {
@@ -530,7 +765,9 @@ class NearbyViewModel(
                     NearbyGame.ROULETTE -> NearbyStage.ROULETTE
                     NearbyGame.TIC_TAC_TOE -> NearbyStage.TIC_TAC_TOE
                     NearbyGame.BOMB -> NearbyStage.BOMB
+                    NearbyGame.BALL -> NearbyStage.BALL
                 }
+                if (_uiState.value.stage == stage && _uiState.value.game == game) return@let
                 if (_uiState.value.isHost) lockRoomForGame()
                 _uiState.update {
                     it.copy(
@@ -540,10 +777,12 @@ class NearbyViewModel(
                         roulette = RouletteUiState(),
                         ttt = TttUiState(),
                         bomb = BombUiState(),
+                        ball = NearbyBallUiState(),
                         error = null,
                     )
                 }
                 if (game == NearbyGame.TIC_TAC_TOE) startTttMatch()
+                if (game == NearbyGame.ROULETTE && _uiState.value.isHost) startRouletteHost()
             }
             "C" -> {
                 val choice = parts.getOrNull(1)?.let(RpsChoice::fromWire) ?: return
@@ -566,6 +805,9 @@ class NearbyViewModel(
                 processBombGuess(value, playerIndex)
             }
             "B" -> handleBombState(parts)
+            "K" -> handleBallBuild(parts)
+            "L" -> handleBallSeed(parts)
+            "J" -> handleBallResult(parts)
         }
     }
 
@@ -656,13 +898,56 @@ class NearbyViewModel(
     }
 
     private fun send(message: String): Boolean {
-        val sent = when {
-            _uiState.value.isHost -> host?.send(message) == true
-            else -> client?.send(message) == true
-        }
+        val sent = sendRaw(message)
         if (!sent) showError("蓝牙尚未连接")
         return sent
     }
+
+    private fun sendRaw(message: String): Boolean = when {
+        _uiState.value.isHost -> host?.send(message) == true
+        else -> client?.send(message) == true
+    }
+
+    /**
+     * 关键状态消息使用应用层序号 + ACK + 重发。
+     * BLE notify 在复杂 2.4G 环境中可能丢失，单次发送无法保证双方状态一致。
+     */
+    private fun sendReliable(message: String): Boolean {
+        val seq = reliableCounter.incrementAndGet()
+        val envelope = "M|$seq|$message"
+        pendingReliable[seq] = PendingReliable()
+        if (!sendRaw(envelope)) {
+            pendingReliable.remove(seq)
+            showError("蓝牙尚未连接")
+            return false
+        }
+        val job = viewModelScope.launch {
+            repeat(8) {
+                delay(320)
+                if (!pendingReliable.containsKey(seq)) return@launch
+                sendRaw(envelope)
+            }
+            if (pendingReliable.remove(seq) != null) {
+                showError("蓝牙信号较弱，部分操作可能延迟")
+            }
+        }
+        pendingReliable[seq] = PendingReliable(job)
+        return true
+    }
+
+    private fun acknowledgeReliable(seq: Int) {
+        pendingReliable.remove(seq)?.job?.cancel()
+    }
+
+    private fun clearReliableState() {
+        pendingReliable.values.forEach { it.job?.cancel() }
+        pendingReliable.clear()
+        seenReliable.clear()
+    }
+
+    private data class PendingReliable(
+        val job: Job? = null,
+    )
 
     private fun showError(message: String) {
         _uiState.update { it.copy(error = message) }
@@ -671,6 +956,9 @@ class NearbyViewModel(
     private fun resetGameState() {
         rouletteEngine = null
         tttMatch = null
+        stopBallBattle()
+        ballRemoteBuild = null
+        ballSeed = null
         bombOver = false
         _uiState.update {
             it.copy(
@@ -679,12 +967,21 @@ class NearbyViewModel(
                 roulette = RouletteUiState(),
                 ttt = TttUiState(),
                 bomb = BombUiState(),
+                ball = NearbyBallUiState(),
             )
         }
     }
 
+    private fun stopBallBattle() {
+        ballLoopJob?.cancel()
+        ballLoopJob = null
+        ballEngine = null
+    }
+
     private fun stopTransport() {
         closing = true
+        clearReliableState()
+        stopBallBattle()
         host?.stop()
         client?.close()
         host = null
