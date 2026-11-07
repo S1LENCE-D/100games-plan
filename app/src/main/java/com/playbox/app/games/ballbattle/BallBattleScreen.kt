@@ -35,8 +35,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.playbox.app.AppContainer
@@ -412,6 +417,14 @@ private fun BallBattleContent(state: BallBattleUiState) {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "金色数字为暴击伤害，双方碰撞都会显示伤害数字",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
@@ -486,6 +499,10 @@ private fun BallArena(
     val surface = MaterialTheme.colorScheme.surfaceContainerLowest
     val grid = MaterialTheme.colorScheme.outlineVariant
     val flashColor = MaterialTheme.colorScheme.onSurface
+    val damageToPlayerColor = MaterialTheme.colorScheme.error
+    val damageToOpponentColor = MaterialTheme.colorScheme.primary
+    val criticalColor = Color(0xFFFFC857)
+    val textMeasurer = rememberTextMeasurer()
     Canvas(modifier = modifier) {
         drawRect(color = surface)
         val scaleX = size.width / snapshot.arenaWidth
@@ -551,6 +568,31 @@ private fun BallArena(
                 radius = (snapshot.player.radius + 18f) * scale,
                 center = center,
                 style = Stroke(width = 3f),
+            )
+        }
+
+        snapshot.damageEvents.forEach { event ->
+            val ageMs = (snapshot.elapsedMs - event.atMs).coerceIn(0L, 1_000L)
+            val progress = ageMs / 1_000f
+            val alpha = 1f - progress
+            val label = if (event.isCritical) "暴击 -${event.amount}" else "-${event.amount}"
+            val color = when {
+                event.isCritical -> criticalColor
+                event.targetPlayer -> damageToPlayerColor
+                else -> damageToOpponentColor
+            }
+            val style = TextStyle(
+                color = color,
+                fontSize = if (event.isCritical) 23.sp else 17.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            val layout = textMeasurer.measure(label, style)
+            val x = xOffset + event.x * scale - layout.size.width / 2f
+            val y = yOffset + event.y * scale - layout.size.height / 2f - progress * 34f
+            drawText(
+                textLayoutResult = layout,
+                topLeft = Offset(x, y),
+                alpha = alpha,
             )
         }
     }

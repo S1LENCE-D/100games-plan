@@ -60,7 +60,7 @@ data class BallBuild(
         get() = BallStats(
             maxHp = 50 + vitality * 10,
             attack = 7 + power * 2,
-            moveSpeed = 130f + agility * 10f,
+            moveSpeed = 175f + agility * 12f,
             radius = 20f + size * 1.6f,
             critChance = (0.03f + luck * 0.025f).coerceAtMost(0.45f),
             mass = 1f + size * 0.28f,
@@ -110,6 +110,17 @@ data class BallBody(
 )
 
 @Immutable
+data class BallDamageEvent(
+    val id: Long,
+    val x: Float,
+    val y: Float,
+    val amount: Int,
+    val isCritical: Boolean,
+    val targetPlayer: Boolean,
+    val atMs: Long,
+)
+
+@Immutable
 data class BallBattleSnapshot(
     val player: BallBody,
     val opponent: BallBody,
@@ -120,6 +131,7 @@ data class BallBattleSnapshot(
     val playerDamageDealt: Int,
     val arenaWidth: Float,
     val arenaHeight: Float,
+    val damageEvents: List<BallDamageEvent> = emptyList(),
 )
 
 /**
@@ -140,6 +152,8 @@ class BallBattleEngine(
     private var collisionFlashUntilMs = -1L
     private var winner: Int? = null
     private var playerDamageDealt = 0
+    private var nextDamageEventId = 0L
+    private val damageEvents = mutableListOf<BallDamageEvent>()
     private var player: BallBody
     private var opponent: BallBody
 
@@ -197,17 +211,21 @@ class BallBattleEngine(
         }
     }
 
-    fun snapshot(): BallBattleSnapshot = BallBattleSnapshot(
-        player = player,
-        opponent = opponent,
-        elapsedMs = elapsedMs,
-        collisionPulse = elapsedMs < collisionFlashUntilMs,
-        winner = winner,
-        isFinished = isFinished,
-        playerDamageDealt = playerDamageDealt,
-        arenaWidth = arenaWidth,
-        arenaHeight = arenaHeight,
-    )
+    fun snapshot(): BallBattleSnapshot {
+        damageEvents.removeAll { elapsedMs - it.atMs > DAMAGE_TEXT_LIFETIME_MS }
+        return BallBattleSnapshot(
+            player = player,
+            opponent = opponent,
+            elapsedMs = elapsedMs,
+            collisionPulse = elapsedMs < collisionFlashUntilMs,
+            winner = winner,
+            isFinished = isFinished,
+            playerDamageDealt = playerDamageDealt,
+            arenaWidth = arenaWidth,
+            arenaHeight = arenaHeight,
+            damageEvents = damageEvents.toList(),
+        )
+    }
 
     private fun moveWithinArena(body: BallBody, seconds: Float, stats: BallStats): BallBody {
         var x = body.x + body.vx * seconds
@@ -284,22 +302,50 @@ class BallBattleEngine(
 
         val playerDamage = calculateDamage(playerStats, opponentStats, impact.coerceAtLeast(0f))
         val opponentDamage = calculateDamage(opponentStats, playerStats, impact.coerceAtLeast(0f))
-        playerDamageDealt += opponentDamage.coerceAtMost(opponent.hp)
-        player = player.copy(hp = (player.hp - playerDamage).coerceAtLeast(0))
-        opponent = opponent.copy(hp = (opponent.hp - opponentDamage).coerceAtLeast(0))
+        playerDamageDealt += opponentDamage.amount.coerceAtMost(opponent.hp)
+        player = player.copy(hp = (player.hp - playerDamage.amount).coerceAtLeast(0))
+        opponent = opponent.copy(hp = (opponent.hp - opponentDamage.amount).coerceAtLeast(0))
+
+        damageEvents += BallDamageEvent(
+            id = nextDamageEventId++,
+            x = player.x,
+            y = player.y - player.radius * 0.2f,
+            amount = playerDamage.amount,
+            isCritical = playerDamage.isCritical,
+            targetPlayer = true,
+            atMs = elapsedMs,
+        )
+        damageEvents += BallDamageEvent(
+            id = nextDamageEventId++,
+            x = opponent.x,
+            y = opponent.y - opponent.radius * 0.2f,
+            amount = opponentDamage.amount,
+            isCritical = opponentDamage.isCritical,
+            targetPlayer = false,
+            atMs = elapsedMs,
+        )
     }
 
     private fun calculateDamage(
         attacker: BallStats,
         defender: BallStats,
         impact: Float,
-    ): Int {
+    ): DamageResult {
         val speedFactor = (0.70f + impact / 450f).coerceIn(0.70f, 1.80f)
         val massFactor = 0.85f + attacker.mass * 0.12f
-        val crit = if (random.nextFloat() < attacker.critChance) 1.80f else 1f
+        val isCritical = random.nextFloat() < attacker.critChance
+        val crit = if (isCritical) 1.80f else 1f
         val raw = attacker.attack * speedFactor * massFactor * crit * (1f - defender.damageReduction)
-        return raw.roundToInt().coerceAtLeast(2)
+        return DamageResult(
+            amount = raw.roundToInt().coerceAtLeast(2),
+            isCritical = isCritical,
+        )
     }
+
+    private data class DamageResult(
+        val amount: Int,
+        val isCritical: Boolean,
+    )
 
     private fun normalizeSpeed(body: BallBody, speed: Float): BallBody {
         val length = sqrt(body.vx * body.vx + body.vy * body.vy)
@@ -346,5 +392,6 @@ class BallBattleEngine(
         const val MAX_BATTLE_MS = 45_000L
         private const val COLLISION_COOLDOWN_MS = 340L
         private const val COLLISION_FLASH_MS = 150L
+        private const val DAMAGE_TEXT_LIFETIME_MS = 1_000L
     }
 }

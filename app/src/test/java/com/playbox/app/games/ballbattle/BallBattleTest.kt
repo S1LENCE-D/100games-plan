@@ -72,3 +72,30 @@ class BallBattleTest {
         }
     }
 }
+
+class BallBattleFeedbackTest {
+
+    @Test
+    fun `base ball speed is raised`() {
+        assertTrue(BallBuild().stats.moveSpeed >= 175f)
+    }
+
+    @Test
+    fun `collision emits damage events with positive amounts`() {
+        val engine = BallBattleEngine(
+            playerBuild = BallBuild(power = 6, vitality = 3, agility = 2, luck = 1),
+            opponentBuild = BallBuild(power = 3, vitality = 4, agility = 3, size = 2),
+            random = Random(11),
+        )
+        var sawDamage = false
+        repeat(1200) {
+            engine.step(16L)
+            val events = engine.snapshot().damageEvents
+            if (events.isNotEmpty()) {
+                sawDamage = true
+                assertTrue(events.all { it.amount > 0 })
+            }
+        }
+        assertTrue(sawDamage)
+    }
+}
