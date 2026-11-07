@@ -17,6 +17,7 @@ import com.playbox.app.AppContainer
 import com.playbox.app.domain.model.GameCatalog
 import com.playbox.app.domain.model.GameId
 import com.playbox.app.games.breakout.BreakoutRouteScreen
+import com.playbox.app.games.ballbattle.BallBattleRouteScreen
 import com.playbox.app.games.dino.DinoRouteScreen
 import com.playbox.app.games.eatcat.EatcatRouteScreen
 import com.playbox.app.games.game2048.Game2048RouteScreen
@@ -122,6 +123,11 @@ fun GameHostScreen(
         )
 
         GameId.DINO -> DinoRouteScreen(
+            container = container,
+            onExit = onExit,
+        )
+
+        GameId.BALL_BATTLE -> BallBattleRouteScreen(
             container = container,
             onExit = onExit,
         )

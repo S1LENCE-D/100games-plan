@@ -34,6 +34,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -359,6 +360,8 @@ fun GameResultDialog(
     scoreLabel: String = "本局得分",
     scoreSuffix: String = "",
     details: List<String> = emptyList(),
+    extraActionLabel: String? = null,
+    onExtraAction: (() -> Unit)? = null,
 ) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
@@ -467,6 +470,20 @@ fun GameResultDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(modifier = Modifier.height(24.dp))
+                        if (extraActionLabel != null && onExtraAction != null) {
+                            OutlinedButton(
+                                onClick = {
+                                    FeedbackController.tap()
+                                    onExtraAction()
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp),
+                            ) {
+                                Text(text = extraActionLabel)
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
                         FilledTonalButton(
                             onClick = {
                                 FeedbackController.tap()

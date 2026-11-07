@@ -214,6 +214,21 @@ private fun DrawScope.drawUnifiedGlyph(
             }
         }
 
+        GameId.BALL_BATTLE -> {
+            drawCircle(color = ink, radius = 4.7f * unit, center = p(7.2f, 12f))
+            drawCircle(
+                color = ink.copy(alpha = 0.62f),
+                radius = 4.1f * unit,
+                center = p(16.8f, 12f),
+            )
+            line(1.5f, 7f, 5f, 9f)
+            line(1.5f, 17f, 5f, 15f)
+            line(22.5f, 7f, 19f, 9f)
+            line(22.5f, 17f, 19f, 15f)
+            line(11.2f, 9.4f, 12.8f, 8.2f)
+            line(11.2f, 14.6f, 12.8f, 15.8f)
+        }
+
         GameId.EATCAT -> {
             val leftEar = Path().apply {
                 moveTo(5.5f * unit, 9f * unit)

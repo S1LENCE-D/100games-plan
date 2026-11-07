@@ -116,6 +116,18 @@ object GameCatalog {
             category = GameCategory.ARCADE,
         ),
         GameInfo(
+            id = GameId.BALL_BATTLE,
+            name = "小球对对碰",
+            tagline = "自由加点，碰撞出击，挑战随机 AI 球。",
+            rules = listOf(
+                "每局拥有 12 个技能点，可自由分配到力量、生命、速度、体型和暴击。",
+                "技能点分配完成后开始自动对战，两个球在场地中反弹并碰撞。",
+                "碰撞时双方同时结算伤害，生命归零的一方落败；45 秒后按剩余生命比例判定。",
+                "单机模式对手为随机加点 AI，尝试不同流派并刷新最高分。",
+            ),
+            category = GameCategory.ARCADE,
+        ),
+        GameInfo(
             id = GameId.EATCAT,
             name = "吃掉小猫猫",
             tagline = "本地网页音游，原生读取得分与 CPS。",

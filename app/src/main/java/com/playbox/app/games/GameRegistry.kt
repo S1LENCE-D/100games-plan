@@ -18,6 +18,7 @@ object GameRegistry {
         GameId.FIFTEEN_PUZZLE,
         GameId.REACTION,
         GameId.DINO,
+        GameId.BALL_BATTLE,
         GameId.EATCAT,
     )
 
