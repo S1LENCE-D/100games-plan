@@ -67,6 +67,9 @@ data class NearbyBallUiState(
     val localReady: Boolean = false,
     val remoteReady: Boolean = false,
     val snapshot: BallBattleSnapshot? = null,
+    val localFinished: Boolean = false,
+    val remoteFinished: Boolean = false,
+    val remoteWinner: Int? = null,
     val winner: Int? = null,
     val isFinished: Boolean = false,
 )

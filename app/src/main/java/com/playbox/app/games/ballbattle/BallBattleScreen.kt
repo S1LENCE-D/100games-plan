@@ -421,6 +421,13 @@ private fun BallBattleContent(state: BallBattleUiState) {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
+            Text(
+                text = "碰撞加速 x${"%.2f".format(snapshot.playerSpeedBoost)} / x${"%.2f".format(snapshot.opponentSpeedBoost)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = "金色数字为暴击伤害，双方碰撞都会显示伤害数字",

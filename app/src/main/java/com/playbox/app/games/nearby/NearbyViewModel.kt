@@ -358,6 +358,9 @@ class NearbyViewModel(
             it.copy(
                 ball = it.ball.copy(
                     snapshot = engine.snapshot(),
+                    localFinished = false,
+                    remoteFinished = false,
+                    remoteWinner = null,
                     winner = null,
                     isFinished = false,
                 ),
@@ -371,11 +374,7 @@ class NearbyViewModel(
                 val snapshot = engine.snapshot()
                 _uiState.update {
                     it.copy(
-                        ball = it.ball.copy(
-                            snapshot = snapshot,
-                            winner = snapshot.winner,
-                            isFinished = snapshot.isFinished,
-                        ),
+                        ball = it.ball.copy(snapshot = snapshot),
                     )
                 }
                 if (engine.isFinished) {
@@ -389,19 +388,58 @@ class NearbyViewModel(
     private fun finishBallBattle() {
         val engine = ballEngine ?: return
         val snapshot = engine.snapshot()
+        ballLoopJob = null
         _uiState.update {
             it.copy(
                 ball = it.ball.copy(
                     snapshot = snapshot,
-                    winner = snapshot.winner,
+                    localFinished = true,
+                    winner = null,
+                    isFinished = false,
+                ),
+            )
+        }
+        sendReliable(
+            "F|${snapshot.winner ?: 0}|${snapshot.player.hp}|${snapshot.opponent.hp}",
+        )
+        tryCompleteBallBattle()
+    }
+
+    private fun handleBallFinished(parts: List<String>) {
+        if (_uiState.value.stage != NearbyStage.BALL) return
+        val winner = parts.getOrNull(1)?.toIntOrNull() ?: return
+        _uiState.update {
+            it.copy(
+                ball = it.ball.copy(
+                    remoteFinished = true,
+                    remoteWinner = winner,
+                ),
+            )
+        }
+        tryCompleteBallBattle()
+    }
+
+    private fun tryCompleteBallBattle() {
+        val state = _uiState.value
+        val ball = state.ball
+        if (ball.isFinished || !ball.localFinished || !ball.remoteFinished) return
+        val finalWinner = if (state.isHost) {
+            ball.snapshot?.winner
+        } else {
+            ball.remoteWinner ?: ball.snapshot?.winner
+        }
+        _uiState.update {
+            it.copy(
+                ball = it.ball.copy(
+                    winner = finalWinner,
                     isFinished = true,
                 ),
             )
         }
-        ballLoopJob = null
-        if (_uiState.value.isHost) {
+        if (state.isHost) {
+            val snapshot = ball.snapshot
             sendReliable(
-                "J|${snapshot.winner ?: 0}|${snapshot.player.hp}|${snapshot.opponent.hp}",
+                "J|${finalWinner ?: 0}|${snapshot?.player?.hp ?: 0}|${snapshot?.opponent?.hp ?: 0}",
             )
         }
     }
@@ -438,16 +476,15 @@ class NearbyViewModel(
         if (_uiState.value.stage != NearbyStage.BALL) return
         if (_uiState.value.isHost) return
         val winner = parts.getOrNull(1)?.toIntOrNull() ?: return
-        ballLoopJob?.cancel()
-        ballLoopJob = null
         _uiState.update {
             it.copy(
                 ball = it.ball.copy(
-                    winner = winner,
-                    isFinished = true,
+                    remoteFinished = true,
+                    remoteWinner = winner,
                 ),
             )
         }
+        tryCompleteBallBattle()
     }
 
     private fun encodeBallBuild(build: BallBuild): String = buildList {
@@ -807,6 +844,7 @@ class NearbyViewModel(
             "B" -> handleBombState(parts)
             "K" -> handleBallBuild(parts)
             "L" -> handleBallSeed(parts)
+            "F" -> handleBallFinished(parts)
             "J" -> handleBallResult(parts)
         }
     }

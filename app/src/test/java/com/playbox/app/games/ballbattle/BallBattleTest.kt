@@ -126,3 +126,22 @@ class BallBattleArenaTest {
         assertEquals(snapshot.arenaWidth, snapshot.arenaHeight, 0.001f)
     }
 }
+
+class BallBattleBoostTest {
+    @Test
+    fun `collisions boost speed with a cap`() {
+        val engine = BallBattleEngine(
+            playerBuild = BallBuild(vitality = 12),
+            opponentBuild = BallBuild(vitality = 12),
+            random = Random(17),
+        )
+        var maxBoost = 1f
+        repeat(4000) {
+            engine.step(16L)
+            val snapshot = engine.snapshot()
+            maxBoost = maxOf(maxBoost, snapshot.playerSpeedBoost)
+        }
+        assertTrue(maxBoost > 1f)
+        assertTrue(maxBoost <= 1.75f)
+    }
+}

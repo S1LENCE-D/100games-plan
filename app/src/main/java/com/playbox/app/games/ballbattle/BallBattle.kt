@@ -140,6 +140,8 @@ data class BallBattleSnapshot(
     val arenaWidth: Float,
     val arenaHeight: Float,
     val damageEvents: List<BallDamageEvent> = emptyList(),
+    val playerSpeedBoost: Float = 1f,
+    val opponentSpeedBoost: Float = 1f,
 )
 
 /**
@@ -160,6 +162,8 @@ class BallBattleEngine(
     private var collisionFlashUntilMs = -1L
     private var winner: Int? = null
     private var playerDamageDealt = 0
+    private var playerSpeedBoost = 1f
+    private var opponentSpeedBoost = 1f
     private var nextDamageEventId = 0L
     private val damageEvents = mutableListOf<BallDamageEvent>()
     private var player: BallBody
@@ -246,6 +250,8 @@ class BallBattleEngine(
             arenaWidth = arenaWidth,
             arenaHeight = arenaHeight,
             damageEvents = damageEvents.toList(),
+            playerSpeedBoost = playerSpeedBoost,
+            opponentSpeedBoost = opponentSpeedBoost,
         )
     }
 
@@ -314,8 +320,12 @@ class BallBattleEngine(
                 vx = opponent.vx + (opponentAfter - opponentNormalSpeed) * nx,
                 vy = opponent.vy + (opponentAfter - opponentNormalSpeed) * ny,
             )
-            player = normalizeSpeed(player, playerStats.moveSpeed)
-            opponent = normalizeSpeed(opponent, opponentStats.moveSpeed)
+            playerSpeedBoost = (playerSpeedBoost + COLLISION_SPEED_BOOST)
+                .coerceAtMost(MAX_SPEED_BOOST)
+            opponentSpeedBoost = (opponentSpeedBoost + COLLISION_SPEED_BOOST)
+                .coerceAtMost(MAX_SPEED_BOOST)
+            player = normalizeSpeed(player, playerStats.moveSpeed * playerSpeedBoost)
+            opponent = normalizeSpeed(opponent, opponentStats.moveSpeed * opponentSpeedBoost)
         }
 
         if (elapsedMs - lastCollisionMs < COLLISION_COOLDOWN_MS) return
@@ -420,5 +430,7 @@ class BallBattleEngine(
         private const val COLLISION_COOLDOWN_MS = 340L
         private const val COLLISION_FLASH_MS = 150L
         private const val DAMAGE_TEXT_LIFETIME_MS = 1_000L
+        private const val COLLISION_SPEED_BOOST = 0.06f
+        private const val MAX_SPEED_BOOST = 1.75f
     }
 }

@@ -302,7 +302,11 @@ private fun BallLobbyBattle(
             Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = if (!ball.isFinished) {
-                    "自动碰撞中 · 金色数字为暴击"
+                    when {
+                        ball.localFinished -> "你的动画已结束，等待好友动画完成…"
+                        ball.remoteFinished -> "好友动画已结束，等待你的动画完成…"
+                        else -> "自动碰撞中 · 金色数字为暴击"
+                    }
                 } else {
                     when (ball.winner) {
                         1 -> if (hostIsMe) "你赢了" else "好友赢了"
@@ -322,6 +326,13 @@ private fun BallLobbyBattle(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "好友加点：${nearbyBuildSummary(state.ball.remoteBuild)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = "碰撞加速 x${"%.2f".format(snapshot.playerSpeedBoost)} / x${"%.2f".format(snapshot.opponentSpeedBoost)}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
