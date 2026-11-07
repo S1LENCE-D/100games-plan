@@ -99,3 +99,17 @@ class BallBattleFeedbackTest {
         assertTrue(sawDamage)
     }
 }
+
+class BallBattleSizeSpeedTest {
+
+    @Test
+    fun `base ball is larger and speed scales with radius`() {
+        val base = BallBuild().stats
+        val larger = BallBuild(size = 6).stats
+        assertTrue(base.radius >= 30f)
+        assertTrue(larger.radius > base.radius)
+        val radiusRatio = larger.radius / base.radius
+        val speedRatio = larger.moveSpeed / base.moveSpeed
+        assertEquals(radiusRatio, speedRatio, 0.001f)
+    }
+}

@@ -11,6 +11,8 @@ import kotlin.math.sqrt
 import kotlin.random.Random
 
 const val BALL_TOTAL_SKILL_POINTS = 12
+private const val BASE_BALL_RADIUS = 30f
+private const val BASE_BALL_SPEED = 220f
 
 enum class BallAttribute(
     val label: String,
@@ -60,12 +62,18 @@ data class BallBuild(
         get() = BallStats(
             maxHp = 50 + vitality * 10,
             attack = 7 + power * 2,
-            moveSpeed = 175f + agility * 12f,
-            radius = 20f + size * 1.6f,
+            moveSpeed = 0f,
+            radius = BASE_BALL_RADIUS + size * 2.2f,
             critChance = (0.03f + luck * 0.025f).coerceAtMost(0.45f),
-            mass = 1f + size * 0.28f,
+            mass = 1f + size * 0.30f,
             damageReduction = (vitality * 0.025f).coerceAtMost(0.30f),
-        )
+        ).let { stats ->
+            // 速度与渲染半径等比：球更大时，屏幕上的移动也更快。
+            stats.copy(
+                moveSpeed = (BASE_BALL_SPEED + agility * 15f) *
+                    (stats.radius / BASE_BALL_RADIUS),
+            )
+        }
 
     companion object {
         fun random(
@@ -198,13 +206,27 @@ class BallBattleEngine(
 
     fun step(deltaMs: Long) {
         if (isFinished) return
-        elapsedMs += deltaMs.coerceAtLeast(0L).coerceAtMost(50L)
-        val seconds = deltaMs.coerceIn(0L, 50L) / 1000f
-        player = moveWithinArena(player, seconds, playerStats)
-        opponent = moveWithinArena(opponent, seconds, opponentStats)
-        resolveCollision()
-        if (winner == null) {
-            checkHealth()
+        val clampedDelta = deltaMs.coerceIn(0L, 50L)
+        elapsedMs += clampedDelta
+        val seconds = clampedDelta / 1000f
+        // 高速和较大的球容易在一帧内穿过去；按最大位移细分，保证真正碰到一起。
+        val maxTravel = maxOf(
+            hypot(player.vx, player.vy),
+            hypot(opponent.vx, opponent.vy),
+        ) * seconds
+        val safeTravel = minOf(player.radius, opponent.radius) * 0.45f
+        val substeps = kotlin.math.ceil(maxTravel / safeTravel.coerceAtLeast(1f))
+            .toInt()
+            .coerceIn(1, 12)
+        val subSeconds = seconds / substeps
+        repeat(substeps) {
+            if (winner != null) return@repeat
+            player = clampToArena(moveWithinArena(player, subSeconds, playerStats))
+            opponent = clampToArena(moveWithinArena(opponent, subSeconds, opponentStats))
+            resolveCollision()
+            player = clampToArena(player)
+            opponent = clampToArena(opponent)
+            if (winner == null) checkHealth()
         }
         if (winner == null && elapsedMs >= MAX_BATTLE_MS) {
             decideByRemainingHealth()
@@ -345,6 +367,11 @@ class BallBattleEngine(
     private data class DamageResult(
         val amount: Int,
         val isCritical: Boolean,
+    )
+
+    private fun clampToArena(body: BallBody): BallBody = body.copy(
+        x = body.x.coerceIn(body.radius, (arenaWidth - body.radius).coerceAtLeast(body.radius)),
+        y = body.y.coerceIn(body.radius, (arenaHeight - body.radius).coerceAtLeast(body.radius)),
     )
 
     private fun normalizeSpeed(body: BallBody, speed: Float): BallBody {
