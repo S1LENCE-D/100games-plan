@@ -153,6 +153,7 @@ class NearbyBleHost(
         if (!started) {
             sending.remove(address)
             onError("蓝牙发送繁忙，正在重试")
+            pumpLocked(address)
         }
     }
 

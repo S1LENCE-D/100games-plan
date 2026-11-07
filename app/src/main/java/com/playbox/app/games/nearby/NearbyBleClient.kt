@@ -123,6 +123,7 @@ class NearbyBleClient(
         if (!started) {
             writeInFlight = false
             onError("蓝牙发送繁忙，正在重试")
+            pumpWriteLocked()
         }
     }
 
