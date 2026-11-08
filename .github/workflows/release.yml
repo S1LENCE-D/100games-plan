@@ -95,7 +95,7 @@ jobs:
       - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: 100Games-Plan-1.0-signed
+          name: 100Games-Plan-1.1-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30

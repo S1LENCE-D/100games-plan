@@ -33,3 +33,9 @@
 - DataStore
 
 更多小游戏会持续加入。
+
+## 制作
+
+- 作者：@Eartecd
+- 图标设计：@Anonymity_v
+- 灵感策划：@十八阶
