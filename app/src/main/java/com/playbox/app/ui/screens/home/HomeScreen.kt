@@ -357,7 +357,7 @@ private fun NearbyEntryCard(onClick: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = "附近联机", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = "蓝牙配对 · 猜拳 / 井字棋 / 轮盘 / 小球 / 数字炸弹",
+                    text = "蓝牙配对，附近开玩",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

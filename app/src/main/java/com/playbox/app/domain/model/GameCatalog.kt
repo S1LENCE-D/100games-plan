@@ -5,7 +5,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.GAME_2048,
             name = "2048",
-            tagline = "滑动合并数字，向 2048 前进。",
+            tagline = "合并数字，冲向 2048",
             rules = listOf(
                 "在 4×4 棋盘上向四个方向滑动，所有数字方块一起移动。",
                 "两个相同数字碰撞时合并为一个，并得到对应分数。",
@@ -16,7 +16,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.TETRIS,
             name = "俄罗斯方块",
-            tagline = "旋转与堆叠，填满整行消除。",
+            tagline = "旋转堆叠，消除整行",
             rules = listOf(
                 "移动并旋转下落的七种方块，让它们整齐堆叠。",
                 "填满一整行即可消除得分，连续消除可获得额外分数。",
@@ -27,7 +27,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.SNAKE,
             name = "贪吃蛇",
-            tagline = "吃掉果实变长，别咬到自己。",
+            tagline = "吃果实，别咬到自己",
             rules = listOf(
                 "通过滑动改变前进方向，蛇会持续向当前方向移动。",
                 "吃到果实后身体增长并得分，速度会逐渐提升。",
@@ -38,7 +38,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.BREAKOUT,
             name = "打砖块",
-            tagline = "拖动挡板反弹小球，击碎砖墙。",
+            tagline = "反弹小球，击碎砖墙",
             rules = listOf(
                 "拖动屏幕底部挡板，将小球反弹向上击碎砖块。",
                 "不同颜色砖块分值不同；清空全部砖块即可过关。",
@@ -49,7 +49,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.MINESWEEPER,
             name = "扫雷",
-            tagline = "推理雷区，标记所有危险方格。",
+            tagline = "标记地雷，翻开安全格",
             rules = listOf(
                 "翻开方格，数字表示相邻八格中的地雷数量。",
                 "长按方格插旗标记地雷；第一次翻开的方格保证安全。",
@@ -61,7 +61,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.MEMORY,
             name = "记忆翻牌",
-            tagline = "记住位置，找出全部相同图案。",
+            tagline = "找出全部相同图案",
             rules = listOf(
                 "可选择 4×4、4×5 或 5×6 牌面，每次翻开两张卡片。",
                 "图案相同即可配对并保持翻开，不同则短暂停留后盖回。",
@@ -72,7 +72,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.SUDOKU,
             name = "数独",
-            tagline = "填入 1–9，让每行每列每宫不重复。",
+            tagline = "填入 1–9，完成数独",
             rules = listOf(
                 "在 9×9 棋盘中填入数字，使每行、每列、每个 3×3 宫都包含 1–9。",
                 "每道题均由程序生成，并保证只有唯一解。",
@@ -84,7 +84,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.TIC_TAC_TOE,
             name = "井字棋",
-            tagline = "连成三子，挑战三档 AI。",
+            tagline = "三子连线即可获胜",
             rules = listOf(
                 "双方轮流在 3×3 棋盘中落子，先将三子连成一线者获胜。",
                 "随机、简单、完美三档 AI：完美 AI 使用极小化极大算法，不会被击败。",
@@ -95,7 +95,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.FIFTEEN_PUZZLE,
             name = "数字华容道",
-            tagline = "移动滑块，把 1–15 按顺序排好。",
+            tagline = "滑动数字，按序复原",
             rules = listOf(
                 "点击空位同行或同列的滑块，或直接滑动棋盘。",
                 "被推动的整行/整列滑块会连续滑入空位。",
@@ -107,7 +107,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.DINO,
             name = "谷歌小恐龙",
-            tagline = "跳过仙人掌，跑得越远越好。",
+            tagline = "跳过障碍，跑得更远",
             rules = listOf(
                 "点击屏幕或跳跃按钮，让小恐龙越过仙人掌。",
                 "奔跑距离越远，速度越快，得分越高。",
@@ -118,7 +118,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.BALL_BATTLE,
             name = "小球对对碰",
-            tagline = "自由加点，单机挑战 AI，联机对战好友。",
+            tagline = "加点碰撞，单机或联机",
             rules = listOf(
                 "每局拥有 12 个技能点，可自由分配到力量、生命、速度、体型和暴击。",
                 "技能点分配完成后开始自动对战，两个球在场地中反弹并碰撞；速度会随渲染尺寸等比提升。",
@@ -130,7 +130,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.GOMOKU,
             name = "五子棋",
-            tagline = "十五路棋盘，先连成五子者胜。",
+            tagline = "先连成五子者获胜",
             rules = listOf(
                 "15×15 棋盘，黑棋先手，双方轮流在交叉点落子。",
                 "横、竖、斜任意方向先连成五子或更多者获胜。",
@@ -142,7 +142,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.CHESS,
             name = "国际象棋",
-            tagline = "8×8 棋盘，王车易位、升变与将死。",
+            tagline = "标准规则，将死对手",
             rules = listOf(
                 "标准 8×8 国际象棋，白棋先手，目标是将死对方的王。",
                 "支持王车易位、吃过路兵、兵升变、将军、将死、逼和、五十回合与三次重复局面。",
@@ -154,7 +154,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.EATCAT,
             name = "吃掉小猫猫",
-            tagline = "本地网页音游，原生读取得分与 CPS。",
+            tagline = "本地网页音游",
             rules = listOf(
                 "内置开源的 eatcat 网页音游，可离线游玩。",
                 "网页负责判定、连击和计分；原生界面实时读取网页上报的得分、命中、行数和 CPS。",
@@ -166,7 +166,7 @@ object GameCatalog {
         GameInfo(
             id = GameId.REACTION,
             name = "反应力挑战",
-            tagline = "屏息等待变色，第一时间点击。",
+            tagline = "变色瞬间，最快点击",
             rules = listOf(
                 "开始前跟随音频节拍完成 4 轮延迟校准，补偿系统与硬件的输入延迟。",
                 "屏幕会先显示等待状态，随后突然变色。",
