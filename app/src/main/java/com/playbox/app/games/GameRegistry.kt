@@ -19,6 +19,7 @@ object GameRegistry {
         GameId.REACTION,
         GameId.DINO,
         GameId.BALL_BATTLE,
+        GameId.GOMOKU,
         GameId.EATCAT,
     )
 

@@ -128,6 +128,18 @@ object GameCatalog {
             category = GameCategory.ARCADE,
         ),
         GameInfo(
+            id = GameId.GOMOKU,
+            name = "五子棋",
+            tagline = "十五路棋盘，先连成五子者胜。",
+            rules = listOf(
+                "15×15 棋盘，黑棋先手，双方轮流在交叉点落子。",
+                "横、竖、斜任意方向先连成五子或更多者获胜。",
+                "支持人机对战与双人同屏；人机模式可选择执黑先手或执白后手。",
+                "人机模式可使用悔棋，会同时撤回 AI 的上一手；双人同屏只撤回一手。",
+            ),
+            category = GameCategory.STRATEGY,
+        ),
+        GameInfo(
             id = GameId.EATCAT,
             name = "吃掉小猫猫",
             tagline = "本地网页音游，原生读取得分与 CPS。",

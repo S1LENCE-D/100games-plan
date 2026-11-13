@@ -17,6 +17,7 @@ enum class GameId(val slug: String) {
     REACTION("reaction"),
     DINO("dino"),
     BALL_BATTLE("ball_battle"),
+    GOMOKU("gomoku"),
     EATCAT("eatcat"),
     ;
 

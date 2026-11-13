@@ -225,6 +225,18 @@ private fun DrawScope.drawUnifiedGlyph(
             drawCircle(color = secondaryAccent, radius = 3.6f * unit, center = p(17.3f, 8.8f))
         }
 
+        GameId.GOMOKU -> {
+            line(4.5f, 4.5f, 19.5f, 4.5f)
+            line(4.5f, 12f, 19.5f, 12f)
+            line(4.5f, 19.5f, 19.5f, 19.5f)
+            line(4.5f, 4.5f, 4.5f, 19.5f)
+            line(12f, 4.5f, 12f, 19.5f)
+            line(19.5f, 4.5f, 19.5f, 19.5f)
+            drawCircle(color = accent, radius = 3.4f * unit, center = p(12f, 12f))
+            drawCircle(color = secondaryAccent, radius = 2.4f * unit, center = p(4.5f, 4.5f))
+            drawCircle(color = ink, radius = 2.4f * unit, center = p(19.5f, 19.5f))
+        }
+
         GameId.EATCAT -> {
             val leftEar = Path().apply {
                 moveTo(5.5f * unit, 9f * unit)
