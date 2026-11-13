@@ -23,6 +23,7 @@ object GameRegistry {
         GameId.CHESS,
         GameId.XIANGQI,
         GameId.UNO,
+        GameId.DOUDIZHU,
         GameId.EATCAT,
     )
 

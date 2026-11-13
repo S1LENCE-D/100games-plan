@@ -176,6 +176,18 @@ object GameCatalog {
             category = GameCategory.CASUAL,
         ),
         GameInfo(
+            id = GameId.DOUDIZHU,
+            name = "斗地主",
+            tagline = "叫地主，先出完牌",
+            rules = listOf(
+                "标准 54 张牌，3 人局；你与 2 个电脑对战。",
+                "叫分决定地主，地主获得 3 张底牌并先出牌；两名农民合作对抗地主。",
+                "使用单张、对子、三带、顺子、连对、飞机、四带二、炸弹和王炸等标准牌型。",
+                "先出完手牌的一方获胜；炸弹、王炸和春天会提高倍数。",
+            ),
+            category = GameCategory.CASUAL,
+        ),
+        GameInfo(
             id = GameId.EATCAT,
             name = "吃掉小猫猫",
             tagline = "本地网页音游",

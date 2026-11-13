@@ -276,6 +276,15 @@ private fun DrawScope.drawUnifiedGlyph(
             drawCircle(color = ink, radius = 2.1f * unit, center = p(12f, 12f))
         }
 
+        GameId.DOUDIZHU -> {
+            drawCircle(color = accent, radius = 4.2f * unit, center = p(7.5f, 9.5f))
+            drawCircle(color = secondaryAccent, radius = 4.2f * unit, center = p(15.8f, 12.5f))
+            line(5f, 18f, 9f, 18f)
+            line(9f, 18f, 7.5f, 16.5f)
+            line(19f, 6f, 15f, 6f)
+            line(15f, 6f, 16.5f, 4.5f)
+        }
+
         GameId.EATCAT -> {
             val leftEar = Path().apply {
                 moveTo(5.5f * unit, 9f * unit)
