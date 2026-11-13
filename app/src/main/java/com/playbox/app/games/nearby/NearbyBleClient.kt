@@ -213,7 +213,7 @@ class NearbyBleClient(
                     return
                 }
             characteristic = char
-            runCatching { gatt.requestMtu(128) }
+            runCatching { gatt.requestMtu(512) }
             runCatching { gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH) }
             gatt.setCharacteristicNotification(char, true)
             val descriptor = char.getDescriptor(NearbyProtocol.CCCD_UUID)

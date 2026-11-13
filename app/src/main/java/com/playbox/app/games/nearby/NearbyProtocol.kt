@@ -19,6 +19,12 @@ import com.playbox.app.games.xiangqi.XiangqiPoint
 import com.playbox.app.games.uno.UnoCard
 import com.playbox.app.games.uno.UnoColor
 import com.playbox.app.games.uno.UnoKind
+import com.playbox.app.games.doudizhu.DdzCard
+import com.playbox.app.games.doudizhu.DdzPhase
+import com.playbox.app.games.doudizhu.DdzPlay
+import com.playbox.app.games.doudizhu.DdzSnapshot
+import com.playbox.app.games.doudizhu.DdzSuit
+import com.playbox.app.games.doudizhu.classifyDdz
 import java.util.UUID
 import kotlin.random.Random
 
@@ -39,6 +45,7 @@ object NearbyProtocol {
     const val GAME_CHESS = "chess"
     const val GAME_XIANGQI = "xiangqi"
     const val GAME_UNO = "uno"
+    const val GAME_DDZ = "ddz"
 
     fun encodeRoomName(name: String): ByteArray {
         val trimmed = name.trim().ifBlank { DEFAULT_ROOM_NAME }
@@ -65,6 +72,7 @@ enum class NearbyGame(val wire: String) {
     CHESS(NearbyProtocol.GAME_CHESS),
     XIANGQI(NearbyProtocol.GAME_XIANGQI),
     UNO(NearbyProtocol.GAME_UNO),
+    DDZ(NearbyProtocol.GAME_DDZ),
     ;
 
     companion object {
@@ -426,23 +434,92 @@ object UnoWire {
         ) to (message.length)
     }
 
-    fun cardCode(card: UnoCard): String =
-        "${card.color.ordinal}${card.kind.ordinal}${card.number?.plus(1) ?: 0}${card.id}"
+    fun cardCode(card: UnoCard): String {
+        val number = ((card.number ?: -1) + 1).coerceIn(0, 99)
+        return "${card.color.ordinal}${card.kind.ordinal}${number.toString().padStart(2, '0')}${card.id}"
+    }
 
     private fun decodeHand(value: String): List<UnoCard> =
         if (value.isBlank()) emptyList() else value.split(',').mapNotNull(::decodeCard)
 
     fun decodeCard(value: String): UnoCard? {
-        if (value.length < 4) return null
+        if (value.length < 5) return null
         val color = UnoColor.entries.getOrNull(value[0] - '0') ?: return null
         val kind = UnoKind.entries.getOrNull(value[1] - '0') ?: return null
-        val number = value[2] - '0'
-        val id = value.substring(3).toIntOrNull() ?: return null
+        val number = value.substring(2, 4).toIntOrNull()?.minus(1) ?: return null
+        val id = value.substring(4).toIntOrNull() ?: return null
         return UnoCard(
             id = id,
             color = color,
             kind = kind,
-            number = number.takeIf { it > 0 }?.minus(1),
+            number = number.takeIf { it >= 0 },
         )
+    }
+}
+
+/** 斗地主联机的紧凑快照；房主是唯一权威端。 */
+object DdzWire {
+    fun cardCode(card: DdzCard): String = "${card.rank}.${card.suit.ordinal}.${card.id}"
+
+    fun encode(s: DdzSnapshot): String = buildString {
+        append("DS")
+        append('|').append(s.phase.ordinal)
+        append('|').append(s.hands.joinToString(";") { h -> h.joinToString(",") { cardCode(it) } })
+        append('|').append(s.bottomCards.joinToString(",") { cardCode(it) })
+        append('|').append(if (s.bottomRevealed) 1 else 0)
+        append('|').append(s.currentPlayer)
+        append('|').append(s.currentBidder)
+        append('|').append(s.highestBid)
+        append('|').append(s.highestBidder)
+        append('|').append(s.landlord)
+        append('|').append(s.lastPlay?.player ?: -1)
+        append('|').append(s.lastPlay?.cards?.joinToString(",") { cardCode(it) }.orEmpty())
+        append('|').append(s.passCount)
+        append('|').append(s.multiplier)
+        append('|').append(s.winner ?: -1)
+        append('|').append(s.landlordWon?.let { if (it) 1 else 0 } ?: -1)
+        append('|').append(s.lastAction)
+    }
+
+    fun decode(message: String): DdzSnapshot? {
+        val p = message.split('|')
+        if (p.size < 17 || p[0] != "DS") return null
+        val phase = DdzPhase.entries.getOrNull(p[1].toIntOrNull() ?: -1) ?: return null
+        val hands = p[2].split(';').map { h -> h.split(',').mapNotNull(::decodeCard) }
+        val bottom = p[3].split(',').mapNotNull(::decodeCard)
+        val lastCards = p[11].split(',').mapNotNull(::decodeCard)
+        val lastPlayer = p[10].toIntOrNull() ?: -1
+        val lastPlay = if (lastPlayer >= 0 && lastCards.isNotEmpty()) {
+            val combo = classifyDdz(lastCards) ?: return null
+            DdzPlay(lastPlayer, lastCards, combo)
+        } else null
+        return DdzSnapshot(
+            phase = phase,
+            hands = hands,
+            bottomCards = bottom,
+            bottomRevealed = p[4] == "1",
+            currentPlayer = p[5].toIntOrNull() ?: 0,
+            currentBidder = p[6].toIntOrNull() ?: 0,
+            highestBid = p[7].toIntOrNull() ?: 0,
+            highestBidder = p[8].toIntOrNull() ?: -1,
+            landlord = p[9].toIntOrNull() ?: -1,
+            lastPlay = lastPlay,
+            passCount = p[12].toIntOrNull() ?: 0,
+            multiplier = p[13].toIntOrNull() ?: 1,
+            lastAction = p.getOrNull(16).orEmpty(),
+            winner = (p[14].toIntOrNull() ?: -1).takeIf { it >= 0 },
+            landlordWon = p[15].toIntOrNull()?.takeIf { it >= 0 }?.let { it == 1 },
+            spring = false,
+            antiSpring = false,
+        )
+    }
+
+    fun decodeCard(value: String): DdzCard? {
+        val p = value.split('.')
+        if (p.size != 3) return null
+        val rank = p[0].toIntOrNull() ?: return null
+        val suit = DdzSuit.entries.getOrNull(p[1].toIntOrNull() ?: -1) ?: return null
+        val id = p[2].toIntOrNull() ?: return null
+        return DdzCard(id, rank, suit)
     }
 }

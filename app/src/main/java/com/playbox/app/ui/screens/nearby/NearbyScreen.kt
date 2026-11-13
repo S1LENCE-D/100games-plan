@@ -295,6 +295,10 @@ fun NearbyRouteScreen(
                     onUnoPlay = viewModel::tapUnoCard,
                     onUnoDraw = viewModel::drawUnoCard,
                     onNextUno = viewModel::nextUnoRound,
+                    onDdzBid = viewModel::bidDdz,
+                    onDdzPlay = viewModel::playDdz,
+                    onDdzPass = viewModel::passDdz,
+                    onNextDdz = viewModel::nextDdzRound,
                     onPullRoulette = viewModel::pullRoulette,
                     onRematchRoulette = viewModel::rematchRoulette,
                     onBombGuess = viewModel::submitBombGuess,
@@ -371,6 +375,10 @@ private fun NearbyContent(
     onUnoPlay: (Int, com.playbox.app.games.uno.UnoColor?) -> Unit,
     onUnoDraw: () -> Unit,
     onNextUno: () -> Unit,
+    onDdzBid: (Int) -> Unit,
+    onDdzPlay: (List<Int>) -> Unit,
+    onDdzPass: () -> Unit,
+    onNextDdz: () -> Unit,
     onPullRoulette: () -> Unit,
     onRematchRoulette: () -> Unit,
     onBombGuess: (Int) -> Unit,
@@ -453,6 +461,14 @@ private fun NearbyContent(
             onPlay = onUnoPlay,
             onDraw = onUnoDraw,
             onNext = onNextUno,
+            onDisconnect = onDisconnect,
+        )
+        NearbyStage.DDZ -> NearbyDdzContent(
+            state = state,
+            onBid = onDdzBid,
+            onPlay = onDdzPlay,
+            onPass = onDdzPass,
+            onNext = onNextDdz,
             onDisconnect = onDisconnect,
         )
         NearbyStage.ROULETTE -> RouletteContent(
@@ -622,6 +638,14 @@ private fun ConnectedLobby(
     Spacer(modifier = Modifier.height(10.dp))
     if (state.playerCount >= 3) {
         if (state.isHost) {
+            GameEntryCard(
+                title = "联机斗地主",
+                description = "3 人叫地主、出牌，先出完手牌的一方获胜。",
+                onClick = { onChooseGame(NearbyGame.DDZ) },
+                centered = true,
+                icon = Icons.Filled.Groups,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
             GameEntryCard(
                 title = "多人数字炸弹",
                 description = "3–6 人轮流猜 1–100，踩中炸弹的玩家出局。",

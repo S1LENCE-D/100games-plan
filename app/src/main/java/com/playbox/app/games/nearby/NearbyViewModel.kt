@@ -15,6 +15,8 @@ import com.playbox.app.games.chess.ChessColor
 import com.playbox.app.games.chess.ChessMove
 import com.playbox.app.games.chess.ChessPieceType
 import com.playbox.app.games.chess.ChessSquare
+import com.playbox.app.games.doudizhu.DdzEngine
+import com.playbox.app.games.doudizhu.DdzPhase
 import com.playbox.app.games.xiangqi.XiangqiColor
 import com.playbox.app.games.xiangqi.XiangqiMove
 import com.playbox.app.games.xiangqi.XiangqiPoint
@@ -49,6 +51,7 @@ class NearbyViewModel(
     private var chessMatch: ChessMatch? = null
     private var xiangqiMatch: XiangqiMatch? = null
     private var unoEngine: UnoEngine? = null
+    private var ddzEngine: DdzEngine? = null
     private var ballEngine: BallBattleEngine? = null
     private var ballLoopJob: Job? = null
     private var ballRemoteBuild: BallBuild? = null
@@ -214,6 +217,8 @@ class NearbyViewModel(
         if (!state.isHost) return
         if (game == NearbyGame.BOMB) {
             if (!state.isHost || state.playerCount < 3) return
+        } else if (game == NearbyGame.DDZ) {
+            if (!state.isHost || state.playerCount != 3) return
         } else {
             if (state.playerCount != 2) return
         }
@@ -227,6 +232,7 @@ class NearbyViewModel(
             NearbyGame.CHESS -> NearbyStage.CHESS
             NearbyGame.XIANGQI -> NearbyStage.XIANGQI
             NearbyGame.UNO -> NearbyStage.UNO
+            NearbyGame.DDZ -> NearbyStage.DDZ
         }
         if (state.isHost) lockRoomForGame()
         _uiState.update {
@@ -242,6 +248,7 @@ class NearbyViewModel(
                 chess = NearbyChessUiState(),
                 xiangqi = NearbyXiangqiUiState(),
                 uno = null,
+                ddz = null,
                 error = null,
             )
         }
@@ -255,6 +262,7 @@ class NearbyViewModel(
             NearbyGame.CHESS -> if (state.isHost) startChessMatch(ChessColor.WHITE)
             NearbyGame.XIANGQI -> if (state.isHost) startXiangqiMatch(XiangqiColor.RED)
             NearbyGame.UNO -> if (state.isHost) startUnoHost()
+            NearbyGame.DDZ -> if (state.isHost) startDdzHost()
             NearbyGame.RPS -> Unit
         }
     }
@@ -842,6 +850,58 @@ class NearbyViewModel(
         playableIndices = engine.playableIndices(),
     )
 
+    fun bidDdz(points: Int) {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.DDZ) return
+        if (state.isHost) {
+            val engine = ddzEngine ?: return
+            if (engine.snapshot().currentBidder != 0) return
+            if (engine.bid(points)) broadcastDdz()
+        } else {
+            sendRaw("DZB|$points")
+        }
+    }
+
+    fun playDdz(cardIds: List<Int>) {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.DDZ) return
+        if (state.isHost) {
+            val engine = ddzEngine ?: return
+            val cards = engine.handOf(0).filter { it.id in cardIds }
+            if (engine.play(cards)) broadcastDdz()
+        } else {
+            sendRaw("DZP|${cardIds.joinToString(",")}")
+        }
+    }
+
+    fun passDdz() {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.DDZ) return
+        if (state.isHost) {
+            if (ddzEngine?.pass() == true) broadcastDdz()
+        } else {
+            sendRaw("DZS")
+        }
+    }
+
+    fun nextDdzRound() {
+        if (_uiState.value.stage != NearbyStage.DDZ || !_uiState.value.isHost) return
+        startDdzHost()
+        sendReliable("DN")
+    }
+
+    private fun startDdzHost() {
+        ddzEngine = DdzEngine()
+        broadcastDdz()
+    }
+
+    private fun broadcastDdz() {
+        val engine = ddzEngine ?: return
+        val snapshot = engine.snapshot()
+        _uiState.update { it.copy(stage = NearbyStage.DDZ, game = NearbyGame.DDZ, ddz = snapshot, error = null) }
+        sendRaw(DdzWire.encode(snapshot))
+    }
+
     private fun syncXiangqi() {
         val match = xiangqiMatch ?: return
         _uiState.update {
@@ -1052,6 +1112,7 @@ class NearbyViewModel(
                     NearbyGame.CHESS -> NearbyStage.CHESS
                     NearbyGame.XIANGQI -> NearbyStage.XIANGQI
                     NearbyGame.UNO -> NearbyStage.UNO
+                    NearbyGame.DDZ -> NearbyStage.DDZ
                 }
                 if (_uiState.value.stage == stage && _uiState.value.game == game) return@let
                 if (_uiState.value.isHost) lockRoomForGame()
@@ -1068,6 +1129,7 @@ class NearbyViewModel(
                         chess = NearbyChessUiState(),
                         xiangqi = NearbyXiangqiUiState(),
                         uno = null,
+                        ddz = null,
                         error = null,
                     )
                 }
@@ -1077,6 +1139,9 @@ class NearbyViewModel(
                 if (game == NearbyGame.XIANGQI) startXiangqiMatch(XiangqiColor.BLACK)
                 if (game == NearbyGame.UNO) {
                     _uiState.update { it.copy(uno = null) }
+                }
+                if (game == NearbyGame.DDZ) {
+                    _uiState.update { it.copy(ddz = null) }
                 }
                 if (game == NearbyGame.ROULETTE && _uiState.value.isHost) startRouletteHost()
             }
@@ -1156,11 +1221,7 @@ class NearbyViewModel(
                 sendRaw(UnoWire.encode(stateFromUno(engine)))
                 syncUnoFromEngine()
             }
-            "UN" -> {
-                if (!_uiState.value.isHost || _uiState.value.stage != NearbyStage.UNO) return
-                startUnoHost()
-                sendRaw(UnoWire.encode(stateFromUno(unoEngine!!)))
-            }
+            "UN" -> Unit
             "B" -> {
                 if (_uiState.value.stage != NearbyStage.CONNECTED) {
                     resetGameState()
@@ -1176,6 +1237,35 @@ class NearbyViewModel(
                     }
                 }
             }
+            "DS" -> {
+                if (_uiState.value.stage != NearbyStage.DDZ) return
+                DdzWire.decode(message)?.let { decoded -> _uiState.update { it.copy(ddz = decoded) } }
+            }
+            "DZB" -> {
+                if (!_uiState.value.isHost || _uiState.value.stage != NearbyStage.DDZ) return
+                val engine = ddzEngine ?: return
+                val points = parts.getOrNull(1)?.toIntOrNull() ?: return
+                val index = hostGuests.keys.indexOf(fromAddress) + 1
+                if (index !in 1..2 || engine.snapshot().currentBidder != index) return
+                if (engine.bid(points)) broadcastDdz()
+            }
+            "DZP" -> {
+                if (!_uiState.value.isHost || _uiState.value.stage != NearbyStage.DDZ) return
+                val engine = ddzEngine ?: return
+                val index = hostGuests.keys.indexOf(fromAddress) + 1
+                if (index !in 1..2 || engine.snapshot().currentPlayer != index) return
+                val ids = parts.getOrNull(1)?.split(',')?.mapNotNull { it.toIntOrNull() }.orEmpty().toSet()
+                val cards = engine.handOf(index).filter { it.id in ids }
+                if (engine.play(cards)) broadcastDdz()
+            }
+            "DZS" -> {
+                if (!_uiState.value.isHost || _uiState.value.stage != NearbyStage.DDZ) return
+                val engine = ddzEngine ?: return
+                val index = hostGuests.keys.indexOf(fromAddress) + 1
+                if (index !in 1..2 || engine.snapshot().currentPlayer != index) return
+                if (engine.pass()) broadcastDdz()
+            }
+            "DN" -> Unit
             "C" -> {
                 val choice = parts.getOrNull(1)?.let(RpsChoice::fromWire) ?: return
                 if (_uiState.value.stage != NearbyStage.RPS) return
@@ -1362,6 +1452,7 @@ class NearbyViewModel(
         chessMatch = null
         xiangqiMatch = null
         unoEngine = null
+        ddzEngine = null
         stopBallBattle()
         ballRemoteBuild = null
         ballSeed = null
@@ -1376,6 +1467,7 @@ class NearbyViewModel(
                 chess = NearbyChessUiState(),
                 xiangqi = NearbyXiangqiUiState(),
                 uno = null,
+                ddz = null,
                 bomb = BombUiState(),
                 ball = NearbyBallUiState(),
             )
