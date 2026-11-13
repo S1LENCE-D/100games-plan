@@ -21,6 +21,7 @@ import com.playbox.app.games.ballbattle.BallBattleRouteScreen
 import com.playbox.app.games.dino.DinoRouteScreen
 import com.playbox.app.games.eatcat.EatcatRouteScreen
 import com.playbox.app.games.game2048.Game2048RouteScreen
+import com.playbox.app.games.chess.ChessRouteScreen
 import com.playbox.app.games.gomoku.GomokuRouteScreen
 import com.playbox.app.games.memory.MemoryRouteScreen
 import com.playbox.app.games.minesweeper.MinesweeperRouteScreen
@@ -134,6 +135,11 @@ fun GameHostScreen(
         )
 
         GameId.GOMOKU -> GomokuRouteScreen(
+            container = container,
+            onExit = onExit,
+        )
+
+        GameId.CHESS -> ChessRouteScreen(
             container = container,
             onExit = onExit,
         )

@@ -140,6 +140,18 @@ object GameCatalog {
             category = GameCategory.STRATEGY,
         ),
         GameInfo(
+            id = GameId.CHESS,
+            name = "国际象棋",
+            tagline = "8×8 棋盘，王车易位、升变与将死。",
+            rules = listOf(
+                "标准 8×8 国际象棋，白棋先手，目标是将死对方的王。",
+                "支持王车易位、吃过路兵、兵升变、将军、将死、逼和、五十回合与三次重复局面。",
+                "支持人机对战与双人同屏；人机模式可选择执白先手或执黑后手。",
+                "人机模式悔棋会同时撤回 AI 的上一手；双人同屏只撤回一手。",
+            ),
+            category = GameCategory.STRATEGY,
+        ),
+        GameInfo(
             id = GameId.EATCAT,
             name = "吃掉小猫猫",
             tagline = "本地网页音游，原生读取得分与 CPS。",

@@ -20,6 +20,7 @@ object GameRegistry {
         GameId.DINO,
         GameId.BALL_BATTLE,
         GameId.GOMOKU,
+        GameId.CHESS,
         GameId.EATCAT,
     )
 

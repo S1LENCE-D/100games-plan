@@ -237,6 +237,24 @@ private fun DrawScope.drawUnifiedGlyph(
             drawCircle(color = ink, radius = 2.4f * unit, center = p(19.5f, 19.5f))
         }
 
+        GameId.CHESS -> {
+            val crown = Path().apply {
+                moveTo(4.5f * unit, 18.5f * unit)
+                lineTo(4.5f * unit, 9.5f * unit)
+                lineTo(8.2f * unit, 12.8f * unit)
+                lineTo(11.5f * unit, 6.5f * unit)
+                lineTo(14.8f * unit, 12.8f * unit)
+                lineTo(18.5f * unit, 9.5f * unit)
+                lineTo(18.5f * unit, 18.5f * unit)
+                close()
+            }
+            drawPath(crown, accent)
+            line(4.5f, 20.5f, 18.5f, 20.5f)
+            drawCircle(color = secondaryAccent, radius = 1.2f * unit, center = p(11.5f, 5f))
+            line(11.5f, 3.8f, 11.5f, 6.2f)
+            line(10.3f, 5f, 12.7f, 5f)
+        }
+
         GameId.EATCAT -> {
             val leftEar = Path().apply {
                 moveTo(5.5f * unit, 9f * unit)
