@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.widget.Toast
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -96,6 +97,11 @@ import com.playbox.app.games.nearby.RpsOutcome
 import com.playbox.app.ui.components.SoftCard
 import com.playbox.app.ui.util.TrackScreen
 
+private enum class NearbyExitMode {
+    LEAVE_GAME,
+    LEAVE_ROOM,
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NearbyRouteScreen(
@@ -116,8 +122,7 @@ fun NearbyRouteScreen(
     }
     val adapter = bluetoothManager?.adapter
     var bluetoothEnabled by remember { mutableStateOf(adapter?.isEnabled == true) }
-    var showExitConfirm by remember { mutableStateOf(false) }
-    var exitToHome by remember { mutableStateOf(false) }
+    var exitMode by remember { mutableStateOf<NearbyExitMode?>(null) }
 
     val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         arrayOf(
@@ -166,13 +171,18 @@ fun NearbyRouteScreen(
             else -> true
         }
         if (inMultiplayer) {
-            exitToHome = uiState.stage == NearbyStage.CONNECTED
-            showExitConfirm = true
+            exitMode = if (uiState.stage == NearbyStage.CONNECTED) {
+                NearbyExitMode.LEAVE_ROOM
+            } else {
+                NearbyExitMode.LEAVE_GAME
+            }
         } else {
             viewModel.cancel()
             onBack()
         }
     }
+
+    BackHandler { requestBack() }
 
     TrackScreen("附近联机")
     Scaffold(
@@ -264,8 +274,11 @@ fun NearbyRouteScreen(
                     onConnect = viewModel::connect,
                     onCancel = viewModel::cancel,
                     onDisconnect = {
-                        exitToHome = false
-                        showExitConfirm = true
+                        exitMode = if (uiState.stage == NearbyStage.CONNECTED) {
+                            NearbyExitMode.LEAVE_ROOM
+                        } else {
+                            NearbyExitMode.LEAVE_GAME
+                        }
                     },
                     onChooseGame = viewModel::chooseGame,
                     onRoomNameChange = viewModel::updateRoomName,
@@ -297,13 +310,14 @@ fun NearbyRouteScreen(
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
-    if (showExitConfirm) {
+    val mode = exitMode
+    if (mode != null) {
         AlertDialog(
-            onDismissRequest = { showExitConfirm = false },
+            onDismissRequest = { exitMode = null },
             title = { Text("退出联机游戏？") },
             text = {
                 Text(
-                    if (uiState.stage == NearbyStage.CONNECTED) {
+                    if (mode == NearbyExitMode.LEAVE_ROOM) {
                         "退出后会断开与附近玩家的连接，并返回主页。"
                     } else {
                         "退出当前游戏后会回到游戏选择界面，联机连接会保留。"
@@ -313,12 +327,13 @@ fun NearbyRouteScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        showExitConfirm = false
-                        if (uiState.stage == NearbyStage.CONNECTED) {
-                            viewModel.disconnect()
-                            if (exitToHome) onBack()
-                        } else {
-                            viewModel.leaveGame()
+                        exitMode = null
+                        when (mode) {
+                            NearbyExitMode.LEAVE_ROOM -> {
+                                viewModel.disconnect()
+                                onBack()
+                            }
+                            NearbyExitMode.LEAVE_GAME -> viewModel.leaveGame()
                         }
                     },
                 ) {
@@ -326,7 +341,7 @@ fun NearbyRouteScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showExitConfirm = false }) {
+                TextButton(onClick = { exitMode = null }) {
                     Text("取消")
                 }
             },
