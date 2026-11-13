@@ -24,6 +24,7 @@ object GameRegistry {
         GameId.XIANGQI,
         GameId.UNO,
         GameId.DOUDIZHU,
+        GameId.LIQUID_SORT,
         GameId.EATCAT,
     )
 

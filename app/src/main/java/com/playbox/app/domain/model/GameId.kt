@@ -22,6 +22,7 @@ enum class GameId(val slug: String) {
     XIANGQI("xiangqi"),
     UNO("uno"),
     DOUDIZHU("doudizhu"),
+    LIQUID_SORT("liquid_sort"),
     EATCAT("eatcat"),
     ;
 

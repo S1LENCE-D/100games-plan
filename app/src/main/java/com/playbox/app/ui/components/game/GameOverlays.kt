@@ -362,6 +362,7 @@ fun GameResultDialog(
     details: List<String> = emptyList(),
     extraActionLabel: String? = null,
     onExtraAction: (() -> Unit)? = null,
+    replayLabel: String = "再来一局",
 ) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
@@ -493,7 +494,7 @@ fun GameResultDialog(
                                 .fillMaxWidth()
                                 .heightIn(min = 48.dp),
                         ) {
-                            Text(text = "再来一局")
+                            Text(text = replayLabel)
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         TextButton(

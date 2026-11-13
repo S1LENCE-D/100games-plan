@@ -188,6 +188,18 @@ object GameCatalog {
             category = GameCategory.CASUAL,
         ),
         GameInfo(
+            id = GameId.LIQUID_SORT,
+            name = "彩液分瓶",
+            tagline = "分层彩液，倒进同色试管",
+            rules = listOf(
+                "每个试管最多容纳 4 层液体，只能把顶部连续同色液体倒入空管或同色顶部试管。",
+                "最终每个试管要么为空，要么装满同一种颜色，即完成分类。",
+                "关卡使用有限试管，颜色越多，空余试管越重要。",
+                "支持撤回、重开、存档与继续下一关。",
+            ),
+            category = GameCategory.PUZZLE,
+        ),
+        GameInfo(
             id = GameId.EATCAT,
             name = "吃掉小猫猫",
             tagline = "本地网页音游",

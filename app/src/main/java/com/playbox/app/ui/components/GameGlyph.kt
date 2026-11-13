@@ -285,6 +285,34 @@ private fun DrawScope.drawUnifiedGlyph(
             line(15f, 6f, 16.5f, 4.5f)
         }
 
+        GameId.LIQUID_SORT -> {
+            val glass = Path().apply {
+                moveTo(7f * unit, 3f * unit)
+                lineTo(17f * unit, 3f * unit)
+                lineTo(17f * unit, 19f * unit)
+                lineTo(16f * unit, 21f * unit)
+                lineTo(8f * unit, 21f * unit)
+                lineTo(7f * unit, 19f * unit)
+                close()
+            }
+            drawPath(glass, ink.copy(alpha = 0.16f))
+            drawPath(glass, ink, style = Stroke(width = 1.4f * unit))
+            val colors = listOf(
+                Color(0xFFE45B78),
+                Color(0xFFF2C14E),
+                Color(0xFF43B581),
+                Color(0xFF4B8BE5),
+            )
+            colors.forEachIndexed { index, color ->
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(8f * unit, (18.5f - index * 3.8f) * unit),
+                    size = Size(8f * unit, 3.8f * unit),
+                    cornerRadius = CornerRadius(0.8f * unit),
+                )
+            }
+        }
+
         GameId.EATCAT -> {
             val leftEar = Path().apply {
                 moveTo(5.5f * unit, 9f * unit)
