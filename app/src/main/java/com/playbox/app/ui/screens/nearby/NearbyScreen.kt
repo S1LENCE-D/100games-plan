@@ -41,7 +41,9 @@ import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.BubbleChart
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -78,6 +80,7 @@ import com.playbox.app.AppContainer
 import com.playbox.app.R
 import com.playbox.app.games.ballbattle.BallAttribute
 import com.playbox.app.games.nearby.NearbyGame
+import com.playbox.app.games.chess.ChessSquare
 import com.playbox.app.games.nearby.NearbyPeer
 import com.playbox.app.games.nearby.NearbySignalQuality
 import com.playbox.app.games.nearby.NearbyPlayer
@@ -111,6 +114,8 @@ fun NearbyRouteScreen(
     }
     val adapter = bluetoothManager?.adapter
     var bluetoothEnabled by remember { mutableStateOf(adapter?.isEnabled == true) }
+    var showExitConfirm by remember { mutableStateOf(false) }
+    var exitToHome by remember { mutableStateOf(false) }
 
     val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         arrayOf(
@@ -150,8 +155,21 @@ fun NearbyRouteScreen(
     }
 
     val requestBack: () -> Unit = {
-        viewModel.cancel()
-        onBack()
+        val inMultiplayer = when (uiState.stage) {
+            NearbyStage.IDLE,
+            NearbyStage.HOSTING,
+            NearbyStage.SCANNING,
+            NearbyStage.CONNECTING,
+            -> false
+            else -> true
+        }
+        if (inMultiplayer) {
+            exitToHome = true
+            showExitConfirm = true
+        } else {
+            viewModel.cancel()
+            onBack()
+        }
     }
 
     TrackScreen("附近联机")
@@ -243,7 +261,10 @@ fun NearbyRouteScreen(
                     onScan = viewModel::startScan,
                     onConnect = viewModel::connect,
                     onCancel = viewModel::cancel,
-                    onDisconnect = viewModel::disconnect,
+                    onDisconnect = {
+                        exitToHome = false
+                        showExitConfirm = true
+                    },
                     onChooseGame = viewModel::chooseGame,
                     onRoomNameChange = viewModel::updateRoomName,
                     onRps = viewModel::selectRps,
@@ -252,6 +273,8 @@ fun NearbyRouteScreen(
                     onNextTtt = viewModel::nextTttRound,
                     onGomokuCell = viewModel::selectGomokuCell,
                     onNextGomoku = viewModel::nextGomokuRound,
+                    onChessSquare = viewModel::tapChessSquare,
+                    onNextChess = viewModel::nextChessRound,
                     onPullRoulette = viewModel::pullRoulette,
                     onRematchRoulette = viewModel::rematchRoulette,
                     onBombGuess = viewModel::submitBombGuess,
@@ -266,6 +289,37 @@ fun NearbyRouteScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+    if (showExitConfirm) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirm = false },
+            title = { Text("退出联机游戏？") },
+            text = {
+                Text(
+                    if (uiState.stage == NearbyStage.CONNECTED) {
+                        "退出后会断开与附近玩家的连接。"
+                    } else {
+                        "退出后会断开连接，本局进度不会保留。"
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showExitConfirm = false
+                        viewModel.disconnect()
+                        if (exitToHome) onBack()
+                    },
+                ) {
+                    Text("退出")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitConfirm = false }) {
+                    Text("取消")
+                }
+            },
+        )
     }
 }
 
@@ -284,6 +338,8 @@ private fun NearbyContent(
     onNextTtt: () -> Unit,
     onGomokuCell: (Int) -> Unit,
     onNextGomoku: () -> Unit,
+    onChessSquare: (ChessSquare) -> Unit,
+    onNextChess: () -> Unit,
     onPullRoulette: () -> Unit,
     onRematchRoulette: () -> Unit,
     onBombGuess: (Int) -> Unit,
@@ -347,6 +403,12 @@ private fun NearbyContent(
             state = state,
             onCell = onGomokuCell,
             onNext = onNextGomoku,
+            onDisconnect = onDisconnect,
+        )
+        NearbyStage.CHESS -> NearbyChessContent(
+            state = state,
+            onSquare = onChessSquare,
+            onNext = onNextChess,
             onDisconnect = onDisconnect,
         )
         NearbyStage.ROULETTE -> RouletteContent(
@@ -549,6 +611,14 @@ private fun ConnectedLobby(
             onClick = { onChooseGame(NearbyGame.GOMOKU) },
             centered = true,
             icon = Icons.Filled.GridOn,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        GameEntryCard(
+            title = "联机国际象棋",
+            description = "房主执白先手，标准 8×8 棋盘。",
+            onClick = { onChooseGame(NearbyGame.CHESS) },
+            centered = true,
+            icon = Icons.Filled.EmojiEvents,
         )
         Spacer(modifier = Modifier.height(12.dp))
         GameEntryCard(

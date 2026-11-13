@@ -5,6 +5,11 @@ import com.playbox.app.games.ballbattle.BallBattleSnapshot
 import com.playbox.app.games.ballbattle.BallBuild
 import com.playbox.app.games.gomoku.GomokuMove
 import com.playbox.app.games.gomoku.GomokuPoint
+import com.playbox.app.games.chess.ChessColor
+import com.playbox.app.games.chess.ChessMove
+import com.playbox.app.games.chess.ChessOutcome
+import com.playbox.app.games.chess.ChessPiece
+import com.playbox.app.games.chess.ChessSquare
 
 enum class NearbySignalQuality {
     UNKNOWN,
@@ -32,6 +37,7 @@ enum class NearbyStage {
     BOMB,
     BALL,
     GOMOKU,
+    CHESS,
 }
 
 @Immutable
@@ -92,6 +98,21 @@ data class NearbyBallUiState(
 )
 
 @Immutable
+data class NearbyChessUiState(
+    val board: List<ChessPiece?> = emptyList(),
+    val sideToMove: ChessColor = ChessColor.WHITE,
+    val selected: ChessSquare? = null,
+    val legalTargets: List<ChessSquare> = emptyList(),
+    val lastMove: ChessMove? = null,
+    val outcome: ChessOutcome = ChessOutcome.ONGOING,
+    val winner: ChessColor? = null,
+    val inCheck: Boolean = false,
+    val moveCount: Int = 0,
+) {
+    val isGameOver: Boolean get() = outcome != ChessOutcome.ONGOING
+}
+
+@Immutable
 data class NearbyGomokuUiState(
     val board: List<Int> = List(225) { 0 },
     val currentPlayer: Int = 1,
@@ -122,6 +143,7 @@ data class NearbyUiState(
     val bomb: BombUiState = BombUiState(),
     val ball: NearbyBallUiState = NearbyBallUiState(),
     val gomoku: NearbyGomokuUiState = NearbyGomokuUiState(),
+    val chess: NearbyChessUiState = NearbyChessUiState(),
     val signalRssi: Int? = null,
     val signalQuality: NearbySignalQuality = NearbySignalQuality.UNKNOWN,
 )

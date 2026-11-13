@@ -11,6 +11,10 @@ import com.playbox.app.games.ballbattle.BALL_TOTAL_SKILL_POINTS
 import com.playbox.app.games.ballbattle.BallAttribute
 import com.playbox.app.games.ballbattle.BallBattleEngine
 import com.playbox.app.games.ballbattle.BallBuild
+import com.playbox.app.games.chess.ChessColor
+import com.playbox.app.games.chess.ChessMove
+import com.playbox.app.games.chess.ChessPieceType
+import com.playbox.app.games.chess.ChessSquare
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -37,6 +41,7 @@ class NearbyViewModel(
     private var rouletteEngine: RouletteEngine? = null
     private var tttMatch: TttMatch? = null
     private var gomokuMatch: GomokuMatch? = null
+    private var chessMatch: ChessMatch? = null
     private var ballEngine: BallBattleEngine? = null
     private var ballLoopJob: Job? = null
     private var ballRemoteBuild: BallBuild? = null
@@ -178,6 +183,7 @@ class NearbyViewModel(
     fun chooseGame(game: NearbyGame) {
         val state = _uiState.value
         if (state.stage != NearbyStage.CONNECTED) return
+        if (!state.isHost) return
         if (game == NearbyGame.BOMB) {
             if (!state.isHost || state.playerCount < 3) return
         } else {
@@ -190,6 +196,7 @@ class NearbyViewModel(
             NearbyGame.BOMB -> NearbyStage.BOMB
             NearbyGame.BALL -> NearbyStage.BALL
             NearbyGame.GOMOKU -> NearbyStage.GOMOKU
+            NearbyGame.CHESS -> NearbyStage.CHESS
         }
         if (state.isHost) lockRoomForGame()
         _uiState.update {
@@ -202,6 +209,7 @@ class NearbyViewModel(
                 bomb = BombUiState(),
                 ball = NearbyBallUiState(),
                 gomoku = NearbyGomokuUiState(),
+                chess = NearbyChessUiState(),
                 error = null,
             )
         }
@@ -212,6 +220,7 @@ class NearbyViewModel(
             NearbyGame.BOMB -> startBombHost()
             NearbyGame.BALL -> Unit
             NearbyGame.GOMOKU -> if (state.isHost) startGomokuMatch(GOMOKU_BLACK)
+            NearbyGame.CHESS -> if (state.isHost) startChessMatch(ChessColor.WHITE)
             NearbyGame.RPS -> Unit
         }
     }
@@ -226,7 +235,7 @@ class NearbyViewModel(
 
     fun nextRpsRound() {
         val state = _uiState.value
-        if (state.stage != NearbyStage.RPS || state.rps.outcome == null) return
+        if (state.stage != NearbyStage.RPS || state.rps.outcome == null || !state.isHost) return
         _uiState.update { it.copy(rps = RpsUiState()) }
         send("N")
     }
@@ -242,7 +251,7 @@ class NearbyViewModel(
 
     fun nextTttRound() {
         val state = _uiState.value
-        if (state.stage != NearbyStage.TIC_TAC_TOE) return
+        if (state.stage != NearbyStage.TIC_TAC_TOE || !state.isHost) return
         if (!state.ttt.isDraw && state.ttt.winner == 0) return
         _uiState.update { it.copy(ttt = TttUiState()) }
         tttMatch?.reset()
@@ -641,7 +650,7 @@ class NearbyViewModel(
 
     fun nextGomokuRound() {
         val state = _uiState.value
-        if (state.stage != NearbyStage.GOMOKU || !state.gomoku.isGameOver) return
+        if (state.stage != NearbyStage.GOMOKU || !state.gomoku.isGameOver || !state.isHost) return
         gomokuMatch?.reset()
         sendReliable("GN")
         syncGomoku()
@@ -665,6 +674,54 @@ class NearbyViewModel(
                     isDraw = match.isDraw,
                     lastMove = match.lastMove,
                     winningLine = match.winningLine,
+                ),
+                error = null,
+            )
+        }
+    }
+
+    fun tapChessSquare(square: ChessSquare) {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.CHESS) return
+        val match = chessMatch ?: return
+        val move = match.tap(square)
+        syncChess()
+        if (move != null) {
+            sendReliable(
+                "CM|${move.from.row}|${move.from.column}|${move.to.row}|${move.to.column}",
+            )
+        }
+    }
+
+    fun nextChessRound() {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.CHESS || !state.chess.isGameOver || !state.isHost) return
+        chessMatch?.reset()
+        sendReliable("CN")
+        syncChess()
+    }
+
+    private fun startChessMatch(localColor: ChessColor) {
+        chessMatch = ChessMatch(localColor)
+        syncChess()
+    }
+
+    private fun syncChess() {
+        val match = chessMatch ?: return
+        _uiState.update {
+            it.copy(
+                stage = NearbyStage.CHESS,
+                game = NearbyGame.CHESS,
+                chess = NearbyChessUiState(
+                    board = match.board,
+                    sideToMove = match.sideToMove,
+                    selected = match.selected,
+                    legalTargets = match.legalTargets,
+                    lastMove = match.lastMove,
+                    outcome = match.outcome,
+                    winner = match.winner,
+                    inCheck = match.inCheck,
+                    moveCount = match.moveCount,
                 ),
                 error = null,
             )
@@ -856,6 +913,7 @@ class NearbyViewModel(
                     NearbyGame.BOMB -> NearbyStage.BOMB
                     NearbyGame.BALL -> NearbyStage.BALL
                     NearbyGame.GOMOKU -> NearbyStage.GOMOKU
+                    NearbyGame.CHESS -> NearbyStage.CHESS
                 }
                 if (_uiState.value.stage == stage && _uiState.value.game == game) return@let
                 if (_uiState.value.isHost) lockRoomForGame()
@@ -869,11 +927,13 @@ class NearbyViewModel(
                         bomb = BombUiState(),
                         ball = NearbyBallUiState(),
                         gomoku = NearbyGomokuUiState(),
+                        chess = NearbyChessUiState(),
                         error = null,
                     )
                 }
                 if (game == NearbyGame.TIC_TAC_TOE) startTttMatch()
                 if (game == NearbyGame.GOMOKU) startGomokuMatch(GOMOKU_WHITE)
+                if (game == NearbyGame.CHESS) startChessMatch(ChessColor.BLACK)
                 if (game == NearbyGame.ROULETTE && _uiState.value.isHost) startRouletteHost()
             }
             "S" -> {
@@ -892,6 +952,24 @@ class NearbyViewModel(
                 if (_uiState.value.stage != NearbyStage.GOMOKU) return
                 gomokuMatch?.reset()
                 syncGomoku()
+            }
+            "CM" -> {
+                if (_uiState.value.stage != NearbyStage.CHESS) return
+                val fromRow = parts.getOrNull(1)?.toIntOrNull() ?: return
+                val fromColumn = parts.getOrNull(2)?.toIntOrNull() ?: return
+                val toRow = parts.getOrNull(3)?.toIntOrNull() ?: return
+                val toColumn = parts.getOrNull(4)?.toIntOrNull() ?: return
+                val match = chessMatch ?: return
+                val candidates = match.legalMovesFrom(ChessSquare(fromRow, fromColumn))
+                    .filter { it.to == ChessSquare(toRow, toColumn) }
+                val move = candidates.firstOrNull { it.promotion == ChessPieceType.QUEEN } ?: candidates.firstOrNull()
+                if (move != null) match.applyRemote(move)
+                syncChess()
+            }
+            "CN" -> {
+                if (_uiState.value.stage != NearbyStage.CHESS) return
+                chessMatch?.reset()
+                syncChess()
             }
             "C" -> {
                 val choice = parts.getOrNull(1)?.let(RpsChoice::fromWire) ?: return
@@ -1076,6 +1154,7 @@ class NearbyViewModel(
         rouletteEngine = null
         tttMatch = null
         gomokuMatch = null
+        chessMatch = null
         stopBallBattle()
         ballRemoteBuild = null
         ballSeed = null
@@ -1087,6 +1166,7 @@ class NearbyViewModel(
                 roulette = RouletteUiState(),
                 ttt = TttUiState(),
                 gomoku = NearbyGomokuUiState(),
+                chess = NearbyChessUiState(),
                 bomb = BombUiState(),
                 ball = NearbyBallUiState(),
             )

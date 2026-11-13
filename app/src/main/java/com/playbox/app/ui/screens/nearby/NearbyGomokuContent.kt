@@ -1,16 +1,19 @@
 package com.playbox.app.ui.screens.nearby
 
+import android.content.res.Configuration
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -25,6 +28,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,10 +52,38 @@ internal fun NearbyGomokuContent(
     val localTurn = !game.isGameOver && game.currentPlayer == localMark
     val markLabel = if (localMark == GOMOKU_BLACK) "黑棋先手" else "白棋后手"
 
-    InfoCard(
-        title = "联机五子棋",
-        message = "你执${if (localMark == GOMOKU_BLACK) "黑" else "白"}·$markLabel，点击交叉点落子。",
-    )
+    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val boardSize = (LocalConfiguration.current.screenHeightDp.dp - 145.dp).coerceAtLeast(180.dp)
+    val infoText = "你执${if (localMark == GOMOKU_BLACK) "黑" else "白"}·$markLabel，点击交叉点落子。"
+
+    if (landscape) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(boardSize)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow),
+            ) {
+                GomokuOnlineBoard(state, localTurn, onCell, Modifier.fillMaxSize())
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                InfoCard(title = "联机五子棋", message = infoText)
+                Spacer(modifier = Modifier.height(8.dp))
+                GomokuStatus(game, localMark, localTurn, state.isHost, onNext)
+                Spacer(modifier = Modifier.height(4.dp))
+                TextButton(onClick = onDisconnect, modifier = Modifier.fillMaxWidth()) {
+                    Text("退出游戏")
+                }
+            }
+        }
+        return
+    }
+
+    InfoCard(title = "联机五子棋", message = infoText)
     Spacer(modifier = Modifier.height(12.dp))
     Box(
         modifier = Modifier
@@ -68,6 +100,21 @@ internal fun NearbyGomokuContent(
         )
     }
     Spacer(modifier = Modifier.height(12.dp))
+    GomokuStatus(game, localMark, localTurn, state.isHost, onNext)
+    Spacer(modifier = Modifier.height(4.dp))
+    TextButton(onClick = onDisconnect, modifier = Modifier.fillMaxWidth()) {
+        Text("退出游戏")
+    }
+}
+
+@Composable
+private fun GomokuStatus(
+    game: com.playbox.app.games.nearby.NearbyGomokuUiState,
+    localMark: Int,
+    localTurn: Boolean,
+    isHost: Boolean,
+    onNext: () -> Unit,
+) {
     Text(
         text = when {
             game.isDraw -> "平局"
@@ -84,13 +131,19 @@ internal fun NearbyGomokuContent(
     )
     if (game.isGameOver) {
         Spacer(modifier = Modifier.height(10.dp))
-        Button(onClick = onNext, modifier = Modifier.fillMaxWidth()) {
-            Text("再来一局")
+        if (isHost) {
+            Button(onClick = onNext, modifier = Modifier.fillMaxWidth()) {
+                Text("下一轮")
+            }
+        } else {
+            Text(
+                text = "等待房主开始下一轮",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
-    }
-    Spacer(modifier = Modifier.height(4.dp))
-    TextButton(onClick = onDisconnect, modifier = Modifier.fillMaxWidth()) {
-        Text("断开连接")
     }
 }
 

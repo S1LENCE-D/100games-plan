@@ -333,7 +333,7 @@ private fun outcomeText(state: ChessUiState): String = when (state.outcome) {
 }
 
 @Composable
-private fun ChessBoard(
+internal fun ChessBoard(
     state: ChessUiState,
     onSquareTap: (ChessSquare) -> Unit,
     modifier: Modifier = Modifier,

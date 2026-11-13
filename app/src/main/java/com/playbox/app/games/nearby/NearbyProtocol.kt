@@ -3,6 +3,13 @@ package com.playbox.app.games.nearby
 import com.playbox.app.games.gomoku.GomokuEngine
 import com.playbox.app.games.gomoku.GomokuMove
 import com.playbox.app.games.gomoku.GomokuPoint
+import com.playbox.app.games.chess.ChessColor
+import com.playbox.app.games.chess.ChessEngine
+import com.playbox.app.games.chess.ChessMove
+import com.playbox.app.games.chess.ChessOutcome
+import com.playbox.app.games.chess.ChessPiece
+import com.playbox.app.games.chess.ChessPieceType
+import com.playbox.app.games.chess.ChessSquare
 import java.util.UUID
 import kotlin.random.Random
 
@@ -20,6 +27,7 @@ object NearbyProtocol {
     const val GAME_BOMB = "bomb"
     const val GAME_BALL = "ball"
     const val GAME_GOMOKU = "gomoku"
+    const val GAME_CHESS = "chess"
 
     fun encodeRoomName(name: String): ByteArray {
         val trimmed = name.trim().ifBlank { DEFAULT_ROOM_NAME }
@@ -43,6 +51,7 @@ enum class NearbyGame(val wire: String) {
     BOMB(NearbyProtocol.GAME_BOMB),
     BALL(NearbyProtocol.GAME_BALL),
     GOMOKU(NearbyProtocol.GAME_GOMOKU),
+    CHESS(NearbyProtocol.GAME_CHESS),
     ;
 
     companion object {
@@ -234,5 +243,74 @@ class GomokuMatch(
 
     fun reset() {
         engine = GomokuEngine()
+    }
+}
+
+/**
+ * 联机国际象棋：房主执白先手，客人执黑。
+ * 只同步最终落子；升变统一选择后。
+ */
+class ChessMatch(
+    val localColor: ChessColor,
+) {
+    private var engine = ChessEngine()
+    var selected: ChessSquare? = null
+        private set
+    var legalTargets: List<ChessSquare> = emptyList()
+        private set
+
+    val board: List<ChessPiece?> get() = (0..63).map { engine.pieceAt(it / 8, it % 8) }
+    val sideToMove: ChessColor get() = engine.sideToMove
+    val lastMove: ChessMove? get() = engine.lastMove
+    val outcome: ChessOutcome get() = engine.status.outcome
+    val winner: ChessColor? get() = engine.status.winner
+    val inCheck: Boolean get() = engine.status.inCheck
+    val moveCount: Int get() = engine.moveCount
+    val isGameOver: Boolean get() = engine.status.isGameOver
+    val isLocalTurn: Boolean get() = !isGameOver && sideToMove == localColor
+
+    fun tap(square: ChessSquare): ChessMove? {
+        if (!isLocalTurn) return null
+        val current = selected
+        if (current == null) {
+            val piece = engine.pieceAt(square.row, square.column) ?: return null
+            if (piece.color != localColor) return null
+            selected = square
+            legalTargets = engine.legalMovesFrom(square).map { it.to }.distinct()
+            return null
+        }
+        if (current == square) {
+            clearSelection()
+            return null
+        }
+        val candidates = engine.legalMovesFrom(current).filter { it.to == square }
+        if (candidates.isEmpty()) {
+            val piece = engine.pieceAt(square.row, square.column)
+            if (piece != null && piece.color == localColor) {
+                selected = square
+                legalTargets = engine.legalMovesFrom(square).map { it.to }.distinct()
+            }
+            return null
+        }
+        clearSelection()
+        val move = candidates.firstOrNull { it.promotion == ChessPieceType.QUEEN } ?: candidates.first()
+        return if (engine.makeMove(move)) move else null
+    }
+
+    fun legalMovesFrom(square: ChessSquare): List<ChessMove> = engine.legalMovesFrom(square)
+
+    fun applyRemote(move: ChessMove): Boolean {
+        if (isGameOver) return false
+        return engine.makeMove(move)
+    }
+
+    fun reset() {
+        engine = ChessEngine()
+        clearSelection()
+    }
+
+    private fun clearSelection() {
+        selected = null
+        legalTargets = emptyList()
     }
 }
