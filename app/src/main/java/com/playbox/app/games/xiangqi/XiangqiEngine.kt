@@ -141,35 +141,74 @@ class XiangqiEngine private constructor(initialized: Boolean) {
         positionCounts[positionKey()] = 1
     }
 
-    fun chooseAiMove(depth: Int = 3): XiangqiMove? {
-        val moves = legalMoves()
-        if (moves.isEmpty()) return null
-        searchDeadline = System.nanoTime() + 800_000_000L
+    fun chooseAiMove(maxDepth: Int = 3): XiangqiMove? {
+        val allMoves = legalMoves()
+        if (allMoves.isEmpty()) return null
+        val moves = allMoves.filterNot { isLosingCapture(it) }.ifEmpty { allMoves }
+        searchDeadline = System.nanoTime() + 650_000_000L
         searchNodes = 0
-        var bestMove = moves.first()
-        var bestScore = Int.MIN_VALUE
-        val ordered = moves.sortedByDescending { moveOrderScore(it) }
-        for (move in ordered) {
-            val copy = XiangqiEngine(this)
-            copy.applyUnchecked(move)
-            val score = -negamax(copy, depth - 1, Int.MIN_VALUE + 1, Int.MAX_VALUE - 1)
-            if (score > bestScore) {
-                bestScore = score
-                bestMove = move
+        var ordered = moves.sortedByDescending { staticRootScore(it) }
+        var best = ordered.firstOrNull() ?: return null
+        for (depth in 2..maxDepth) {
+            var iterationBest: XiangqiMove? = null
+            var iterationScore = Int.MIN_VALUE
+            var completed = true
+            for (move in ordered) {
+                if (timeUp()) {
+                    completed = false
+                    break
+                }
+                val copy = XiangqiEngine(this)
+                copy.applyUnchecked(move)
+                val score = -negamax(copy, depth - 1, Int.MIN_VALUE + 1, Int.MAX_VALUE - 1)
+                if (score > iterationScore) {
+                    iterationScore = score
+                    iterationBest = move
+                }
             }
-            if (System.nanoTime() >= searchDeadline) break
+            if (iterationBest != null) {
+                best = iterationBest
+                ordered = listOf(best) + ordered.filter { it != best }
+            }
+            if (!completed || timeUp()) break
         }
-        return bestMove
+        return best
+    }
+
+    private fun timeUp(): Boolean = System.nanoTime() >= searchDeadline
+
+    private fun isLosingCapture(move: XiangqiMove): Boolean {
+        val captured = pieceAt(move.to.row, move.to.column) ?: return false
+        val mover = pieceAt(move.from.row, move.from.column) ?: return false
+        val copy = XiangqiEngine(this)
+        copy.applyUnchecked(move)
+        if (!copy.isAttacked(move.to, copy.sideToMove)) return false
+        if (copy.isDefended(move.to, mover.color)) return false
+        return copy.pieceValue(mover, move.to.row, move.to.column) > copy.pieceValue(captured, move.to.row, move.to.column)
+    }
+
+    private fun staticRootScore(move: XiangqiMove): Int {
+        val copy = XiangqiEngine(this)
+        val moved = copy.pieceAt(move.from.row, move.from.column) ?: return Int.MIN_VALUE
+        copy.applyUnchecked(move)
+        var score = -copy.evaluate()
+        val attacked = copy.isAttacked(move.to, copy.sideToMove)
+        if (attacked) {
+            val defended = copy.isDefended(move.to, moved.color)
+            val value = copy.pieceValue(moved, move.to.row, move.to.column)
+            score -= if (defended) value / 4 else value
+        }
+        return score
     }
 
     private fun negamax(engine: XiangqiEngine, depth: Int, alpha: Int, beta: Int): Int {
         searchNodes += 1
-        if ((searchNodes and 511) == 0 && System.nanoTime() >= searchDeadline) return engine.evaluate()
+        if (timeUp()) return engine.evaluate()
         val moves = engine.legalMoves()
         if (moves.isEmpty()) {
             return if (engine.isInCheck(engine.sideToMove)) -MATE_SCORE - depth else -MATE_SCORE / 2 - depth
         }
-        if (depth <= 0) return engine.evaluate()
+        if (depth <= 0) return engine.quiescence(alpha, beta, 1)
         var localAlpha = alpha
         var localBeta = beta
         val ordered = moves.sortedByDescending { engine.moveOrderScore(it) }
@@ -179,24 +218,49 @@ class XiangqiEngine private constructor(initialized: Boolean) {
             val score = -negamax(child, depth - 1, -localBeta, -localAlpha)
             if (score >= localBeta) return localBeta
             if (score > localAlpha) localAlpha = score
-            if (System.nanoTime() >= searchDeadline) break
+            if (timeUp()) break
         }
         return localAlpha
     }
+
+    private fun quiescence(alpha: Int, beta: Int, qDepth: Int): Int {
+        val standPat = evaluate()
+        if (qDepth <= 0 || timeUp()) return standPat
+        var localAlpha = maxOf(alpha, standPat)
+        if (localAlpha >= beta) return localAlpha
+        val captures = legalMoves()
+            .filter { pieceAt(it.to.row, it.to.column) != null }
+            .sortedByDescending { moveOrderScore(it) }
+        for (move in captures) {
+            val child = XiangqiEngine(this)
+            child.applyUnchecked(move)
+            val score = -child.quiescence(-beta, -localAlpha, qDepth - 1)
+            if (score >= beta) return beta
+            if (score > localAlpha) localAlpha = score
+            if (timeUp()) break
+        }
+        return localAlpha
+    }
+
+    private fun isAttacked(point: XiangqiPoint, byColor: XiangqiColor): Boolean =
+        pseudoMoves(byColor).any { it.to == point }
+
+    private fun isDefended(point: XiangqiPoint, color: XiangqiColor): Boolean =
+        pseudoMoves(color).any { it.to == point }
 
     private fun evaluate(): Int {
         var score = 0
         for (row in 0..9) {
             for (column in 0..8) {
                 val piece = board[row * 9 + column] ?: continue
-                val value = pieceValue(piece)
+                val value = pieceValue(piece, row, column)
                 score += if (piece.color == sideToMove) value else -value
             }
         }
         return score
     }
 
-    private fun pieceValue(piece: XiangqiPiece): Int {
+    private fun pieceValue(piece: XiangqiPiece, row: Int, column: Int): Int {
         val base = when (piece.type) {
             XiangqiPieceType.GENERAL -> 10_000
             XiangqiPieceType.CHARIOT -> 900
@@ -206,12 +270,31 @@ class XiangqiEngine private constructor(initialized: Boolean) {
             XiangqiPieceType.ELEPHANT -> 200
             XiangqiPieceType.SOLDIER -> 100
         }
-        val advanced = if (piece.type == XiangqiPieceType.SOLDIER) {
-            if (piece.color == XiangqiColor.RED) (6 - 0).coerceAtLeast(0) * 6 else 0
-        } else {
-            0
+        val positional = when (piece.type) {
+            XiangqiPieceType.SOLDIER -> {
+                if (piece.color == XiangqiColor.RED) {
+                    val advanced = (6 - row).coerceAtLeast(0) * 14
+                    advanced + if (row <= 4) 35 else 0
+                } else {
+                    val advanced = (row - 3).coerceAtLeast(0) * 14
+                    advanced + if (row >= 5) 35 else 0
+                }
+            }
+            XiangqiPieceType.HORSE -> {
+                val homePenalty = if (
+                    (piece.color == XiangqiColor.RED && row == 9) ||
+                    (piece.color == XiangqiColor.BLACK && row == 0)
+                ) -30 else 0
+                homePenalty + (4 - kotlin.math.abs(column - 4)) * 5
+            }
+            XiangqiPieceType.CANNON -> (4 - kotlin.math.abs(column - 4)) * 6
+            XiangqiPieceType.CHARIOT -> (4 - kotlin.math.abs(column - 4)) * 3
+            XiangqiPieceType.ADVISOR,
+            XiangqiPieceType.ELEPHANT,
+            XiangqiPieceType.GENERAL,
+            -> 0
         }
-        return base + advanced
+        return base + positional
     }
 
     private fun moveOrderScore(move: XiangqiMove): Int {

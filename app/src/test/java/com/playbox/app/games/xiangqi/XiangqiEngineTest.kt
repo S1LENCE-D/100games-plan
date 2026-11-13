@@ -40,6 +40,16 @@ class XiangqiEngineTest {
     }
 
     @Test
+    fun `ai avoids the opening cannon sacrifice`() {
+        val engine = XiangqiEngine()
+        assertTrue(engine.makeMove(move(6, 4, 5, 4)))
+        val aiMove = engine.chooseAiMove(3)
+        assertNotNull(aiMove)
+        assertTrue(aiMove != XiangqiMove(XiangqiPoint(2, 1), XiangqiPoint(9, 1)))
+        assertTrue(aiMove != XiangqiMove(XiangqiPoint(2, 7), XiangqiPoint(9, 7)))
+    }
+
+    @Test
     fun `ai returns a legal move`() {
         val engine = XiangqiEngine()
         val aiMove = engine.chooseAiMove(2)
