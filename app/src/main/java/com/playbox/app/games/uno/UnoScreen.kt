@@ -382,7 +382,7 @@ private fun OpponentRow(state: UnoUiState) {
 }
 
 @Composable
-private fun UnoCardView(
+internal fun UnoCardView(
     card: UnoCard,
     enabled: Boolean,
     onClick: () -> Unit,
@@ -436,7 +436,7 @@ private fun UnoCardView(
 }
 
 @Composable
-private fun CardBack(modifier: Modifier = Modifier) {
+internal fun CardBack(modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(10.dp),
@@ -473,7 +473,7 @@ private fun CardBack(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ColorPickerDialog(
+internal fun ColorPickerDialog(
     onSelect: (UnoColor) -> Unit,
     onDismiss: () -> Unit,
 ) {
