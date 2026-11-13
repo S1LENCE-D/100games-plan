@@ -77,9 +77,9 @@ fun UnoRouteScreen(
     val statusText = when {
         !state.hasStarted -> "准备开始"
         state.isGameOver -> "对局结束"
-        state.isAiThinking -> "电脑出牌中…"
+        state.isAiThinking -> "电脑${state.currentPlayer} 思考中…"
         state.humanTurn -> "轮到你"
-        else -> "电脑出牌中…"
+        else -> "电脑${state.currentPlayer} 回合"
     }
 
     GameScaffold(
@@ -110,13 +110,28 @@ fun UnoRouteScreen(
             ) {
                 OpponentRow(state)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = state.lastAction.ifBlank { "等待开始" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center,
-                )
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = "上一步",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = state.lastAction.ifBlank { "等待开始" },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier

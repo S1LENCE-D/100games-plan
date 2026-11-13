@@ -132,7 +132,7 @@ class UnoViewModel(
         aiJob = viewModelScope.launch {
             while (!engine.snapshot().isGameOver && engine.currentPlayer != 0) {
                 _uiState.update { it.copy(isAiThinking = true) }
-                delay(420)
+                delay(AI_THINK_MS)
                 val player = engine.currentPlayer
                 if (engine.handOf(player).size == 2) {
                     engine.callUno(player)
@@ -157,6 +157,13 @@ class UnoViewModel(
                     }
                 }
                 syncState()
+                _uiState.update { it.copy(isAiThinking = false) }
+                if (engine.snapshot().isGameOver) {
+                    delay(AI_RESULT_VIEW_MS)
+                    break
+                }
+                // 给玩家留出看清电脑出了什么牌、是否抽牌的时间。
+                delay(AI_ACTION_VIEW_MS)
             }
             _uiState.update { it.copy(isAiThinking = false) }
             if (engine.snapshot().isGameOver) finishGame()
@@ -205,6 +212,10 @@ class UnoViewModel(
     }
 
     companion object {
+        private const val AI_THINK_MS = 650L
+        private const val AI_ACTION_VIEW_MS = 1_200L
+        private const val AI_RESULT_VIEW_MS = 1_000L
+
         fun factory(statsRepository: GameStatsRepository): ViewModelProvider.Factory =
             viewModelFactory {
                 initializer {
