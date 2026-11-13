@@ -23,6 +23,7 @@ import kotlinx.serialization.json.Json
 @Serializable
 private data class SavedLiquidSort(
     val snapshot: LiquidSortSnapshot,
+    val totalScore: Int = 0,
 )
 
 class LiquidSortViewModel(
@@ -47,15 +48,15 @@ class LiquidSortViewModel(
     }
 
     fun startGame() {
-        startLevel(1)
+        startLevel(1, resetScore = true)
     }
 
     fun nextLevel() {
-        startLevel(_uiState.value.level + 1)
+        startLevel(_uiState.value.level + 1, resetScore = false)
     }
 
     fun restart() {
-        startLevel(_uiState.value.level)
+        startLevel(_uiState.value.level, resetScore = false)
     }
 
     fun selectTube(index: Int) {
@@ -133,7 +134,7 @@ class LiquidSortViewModel(
     fun saveGame() {
         val state = _uiState.value
         if (!state.hasStarted || state.isSolved) return
-        val saved = SavedLiquidSort(engine.snapshot())
+        val saved = SavedLiquidSort(engine.snapshot(), state.score)
         viewModelScope.launch {
             runCatching { saveRepository.save(gameId, json.encodeToString(saved)) }
                 .onFailure { throwable ->
@@ -142,10 +143,15 @@ class LiquidSortViewModel(
         }
     }
 
-    private fun startLevel(level: Int) {
+    private fun startLevel(level: Int, resetScore: Boolean) {
+        val retainedScore = if (resetScore) 0 else _uiState.value.score
         engine = LiquidSortEngine.newGame(level)
         finishHandled = false
-        _uiState.value = previewState().copy(hasStarted = true)
+        _uiState.value = previewState().copy(
+            hasStarted = true,
+            score = retainedScore,
+            lastLevelScore = 0,
+        )
         markGameOpenedOnce()
         clearPersistentSave()
     }
@@ -153,11 +159,22 @@ class LiquidSortViewModel(
     private fun finishGame() {
         if (finishHandled) return
         finishHandled = true
-        val score = (1000 - engine.moves * 8).coerceAtLeast(100)
-        _uiState.update { it.copy(score = score, selectedTube = null) }
+        val levelScore = LiquidSortScoring.levelScore(
+            level = engine.level,
+            colorCount = _uiState.value.colorCount,
+            moves = engine.moves,
+        )
+        val totalScore = _uiState.value.score + levelScore
+        _uiState.update {
+            it.copy(
+                score = totalScore,
+                lastLevelScore = levelScore,
+                selectedTube = null,
+            )
+        }
         viewModelScope.launch {
             clearPersistentSave()
-            val isNewRecord = persistFinishedGame(score)
+            val isNewRecord = persistFinishedGame(totalScore)
             _uiState.update { it.copy(showResult = true, isNewRecord = isNewRecord) }
         }
     }
@@ -180,6 +197,7 @@ class LiquidSortViewModel(
             canUndo = false,
             hasStarted = true,
             showSaveChoice = false,
+            score = saved.totalScore,
             message = "选择空管或顶部同色的试管",
         )
     }
@@ -194,7 +212,7 @@ class LiquidSortViewModel(
         viewModelScope.launch {
             val state = _uiState.value
             if (state.hasStarted && !state.isSolved) {
-                val saved = SavedLiquidSort(engine.snapshot())
+                val saved = SavedLiquidSort(engine.snapshot(), state.score)
                 runCatching { saveRepository.save(gameId, json.encodeToString(saved)) }
             }
             onSaved()
@@ -221,7 +239,7 @@ class LiquidSortViewModel(
     private fun previewState(): LiquidSortUiState = LiquidSortUiState(
         tubes = engine.currentTubes,
         level = engine.level,
-        colorCount = engine.tubeCount - 2,
+        colorCount = engine.colors,
         moves = engine.moves,
         canUndo = engine.canUndo,
     )

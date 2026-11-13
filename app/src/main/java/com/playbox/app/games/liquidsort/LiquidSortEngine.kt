@@ -28,6 +28,7 @@ class LiquidSortEngine private constructor(
     private val history = ArrayDeque<LiquidSortSnapshot>()
 
     val tubeCount: Int get() = tubes.size
+    val colors: Int get() = colorCount
     val currentTubes: List<List<Int>> get() = tubes.map { it.toList() }
     val canUndo: Boolean get() = history.isNotEmpty()
 

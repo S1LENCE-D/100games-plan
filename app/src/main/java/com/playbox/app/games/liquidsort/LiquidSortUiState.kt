@@ -17,5 +17,6 @@ data class LiquidSortUiState(
     val showResult: Boolean = false,
     val isNewRecord: Boolean = false,
     val score: Int = 0,
+    val lastLevelScore: Int = 0,
     val isSolved: Boolean = false,
 )

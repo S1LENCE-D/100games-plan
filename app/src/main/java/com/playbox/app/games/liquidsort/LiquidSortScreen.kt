@@ -61,6 +61,7 @@ private val LiquidHelp = listOf(
     "点击一个有液体的试管选中它，再点击目标试管倒入。",
     "只有目标试管为空，或目标顶部颜色与来源顶部颜色相同，才能倒入。",
     "一次会把来源顶部连续的同色液体尽量倒入目标；最终每个试管要么为空，要么只有一种颜色。",
+    "关卡越高基础分越高，步数也会按比例提高本关得分；高分是各关累计总分。",
 )
 
 private val LiquidPalette = listOf(
@@ -236,10 +237,11 @@ fun LiquidSortRouteScreen(
             isNewRecord = state.isNewRecord,
             onReplay = viewModel::nextLevel,
             onExit = onExit,
+            scoreLabel = "累计得分",
             replayLabel = "下一关",
             details = listOf(
-                "第 ${state.level} 关完成",
-                "用了 ${state.moves} 步",
+                "第 ${state.level} 关完成 · 本关 ${state.lastLevelScore} 分",
+                "累计 ${state.score} 分 · ${state.moves} 步",
             ),
         )
     }
@@ -258,13 +260,12 @@ private fun TubeView(
         else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
     }
     val glassTint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.35f)
-    val targetGlow = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.22f)
-    val shadow = Color.Black.copy(alpha = 0.32f)
+    val targetGlow = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.8f)
+    val shadow = Color.Black.copy(alpha = 0.16f)
     Canvas(
         modifier = Modifier
             .width(56.dp)
             .height(150.dp)
-            .offset(y = if (selected) (-8).dp else 0.dp)
             .clickable(onClick = onClick),
     ) {
         val left = 5f
@@ -272,17 +273,18 @@ private fun TubeView(
         val right = size.width - 5f
         val bottom = size.height - 4f
         val inner = Rect(left + 4f, top + 6f, right - 4f, bottom - 4f)
-        if (validTarget || selected) {
+        if (validTarget && !selected) {
             drawRoundRect(
                 color = targetGlow,
-                topLeft = Offset(left - 4f, top - 4f),
-                size = Size(right - left + 8f, bottom - top + 6f),
-                cornerRadius = CornerRadius(18f, 18f),
+                topLeft = Offset(left - 3f, top - 3f),
+                size = Size(right - left + 6f, bottom - top + 5f),
+                cornerRadius = CornerRadius(17f, 17f),
+                style = Stroke(width = 2f),
             )
         }
         drawRoundRect(
             color = shadow,
-            topLeft = Offset(left + 3f, top + 5f),
+            topLeft = Offset(left + 2f, top + 3f),
             size = Size(right - left, bottom - top),
             cornerRadius = CornerRadius(16f, 16f),
         )
@@ -297,16 +299,7 @@ private fun TubeView(
                 ),
             )
         }
-        drawPath(
-            glass,
-            brush = Brush.verticalGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = 0.16f),
-                    glassTint,
-                    Color.White.copy(alpha = 0.04f),
-                ),
-            ),
-        )
+        drawPath(glass, glassTint)
         val liquidClip = Path().apply {
             addRoundRect(
                 RoundRect(
@@ -357,18 +350,32 @@ private fun TubeView(
             color = outline,
             style = Stroke(width = if (selected) 3f else 2f),
         )
-        // 管口与内壁
+        // 管口厚玻璃圈，让玻璃壁和管口更明确
+        drawRoundRect(
+            color = Color.White.copy(alpha = 0.10f),
+            topLeft = Offset(left - 1f, top - 2f),
+            size = Size(right - left + 2f, 12f),
+            cornerRadius = CornerRadius(7f, 7f),
+        )
         drawRoundRect(
             color = outline,
-            topLeft = Offset(left, top),
-            size = Size(right - left, 8f),
-            cornerRadius = CornerRadius(8f, 8f),
-            style = Stroke(width = if (selected) 3f else 2f),
+            topLeft = Offset(left - 1f, top - 2f),
+            size = Size(right - left + 2f, 12f),
+            cornerRadius = CornerRadius(7f, 7f),
+            style = Stroke(width = if (selected) 3f else 2.5f),
         )
-        drawOval(
-            color = Color.White.copy(alpha = 0.12f),
-            topLeft = Offset(left + 5f, top + 2f),
-            size = Size(right - left - 10f, 4f),
+        drawRoundRect(
+            color = Color.White.copy(alpha = 0.42f),
+            topLeft = Offset(left + 4f, top + 1.5f),
+            size = Size(right - left - 8f, 5f),
+            cornerRadius = CornerRadius(3f),
+            style = Stroke(width = 1.2f),
+        )
+        drawLine(
+            color = Color.White.copy(alpha = 0.24f),
+            start = Offset(left + 3f, top + 9f),
+            end = Offset(right - 3f, top + 9f),
+            strokeWidth = 1f,
         )
         // 玻璃高光
         drawLine(
@@ -382,6 +389,12 @@ private fun TubeView(
             start = Offset(right - 11f, top + 24f),
             end = Offset(right - 11f, bottom - 38f),
             strokeWidth = 1.2f,
+        )
+        drawLine(
+            color = outline.copy(alpha = 0.45f),
+            start = Offset(left + 4f, top + 13f),
+            end = Offset(left + 4f, bottom - 12f),
+            strokeWidth = 1f,
         )
     }
 }
