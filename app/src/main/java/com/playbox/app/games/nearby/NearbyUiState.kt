@@ -3,6 +3,22 @@ package com.playbox.app.games.nearby
 import androidx.compose.runtime.Immutable
 import com.playbox.app.games.ballbattle.BallBattleSnapshot
 import com.playbox.app.games.ballbattle.BallBuild
+import com.playbox.app.games.gomoku.GomokuMove
+import com.playbox.app.games.gomoku.GomokuPoint
+
+enum class NearbySignalQuality {
+    UNKNOWN,
+    GOOD,
+    FAIR,
+    POOR,
+}
+
+fun signalQualityFor(rssi: Int?): NearbySignalQuality = when {
+    rssi == null -> NearbySignalQuality.UNKNOWN
+    rssi >= -65 -> NearbySignalQuality.GOOD
+    rssi >= -80 -> NearbySignalQuality.FAIR
+    else -> NearbySignalQuality.POOR
+}
 
 enum class NearbyStage {
     IDLE,
@@ -15,6 +31,7 @@ enum class NearbyStage {
     TIC_TAC_TOE,
     BOMB,
     BALL,
+    GOMOKU,
 }
 
 @Immutable
@@ -75,6 +92,18 @@ data class NearbyBallUiState(
 )
 
 @Immutable
+data class NearbyGomokuUiState(
+    val board: List<Int> = List(225) { 0 },
+    val currentPlayer: Int = 1,
+    val winner: Int = 0,
+    val isDraw: Boolean = false,
+    val lastMove: GomokuMove? = null,
+    val winningLine: List<GomokuPoint> = emptyList(),
+) {
+    val isGameOver: Boolean get() = winner != 0 || isDraw
+}
+
+@Immutable
 data class NearbyUiState(
     val stage: NearbyStage = NearbyStage.IDLE,
     val peers: List<NearbyPeer> = emptyList(),
@@ -92,4 +121,7 @@ data class NearbyUiState(
     val ttt: TttUiState = TttUiState(),
     val bomb: BombUiState = BombUiState(),
     val ball: NearbyBallUiState = NearbyBallUiState(),
+    val gomoku: NearbyGomokuUiState = NearbyGomokuUiState(),
+    val signalRssi: Int? = null,
+    val signalQuality: NearbySignalQuality = NearbySignalQuality.UNKNOWN,
 )

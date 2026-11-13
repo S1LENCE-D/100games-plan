@@ -1,5 +1,8 @@
 package com.playbox.app.games.nearby
 
+import com.playbox.app.games.gomoku.GomokuEngine
+import com.playbox.app.games.gomoku.GomokuMove
+import com.playbox.app.games.gomoku.GomokuPoint
 import java.util.UUID
 import kotlin.random.Random
 
@@ -16,6 +19,7 @@ object NearbyProtocol {
     const val GAME_TTT = "ttt"
     const val GAME_BOMB = "bomb"
     const val GAME_BALL = "ball"
+    const val GAME_GOMOKU = "gomoku"
 
     fun encodeRoomName(name: String): ByteArray {
         val trimmed = name.trim().ifBlank { DEFAULT_ROOM_NAME }
@@ -38,6 +42,7 @@ enum class NearbyGame(val wire: String) {
     TIC_TAC_TOE(NearbyProtocol.GAME_TTT),
     BOMB(NearbyProtocol.GAME_BOMB),
     BALL(NearbyProtocol.GAME_BALL),
+    GOMOKU(NearbyProtocol.GAME_GOMOKU),
     ;
 
     companion object {
@@ -194,5 +199,40 @@ class TttMatch(
             }
         }
         if (cells.none { it == 0 }) isDraw = true
+    }
+}
+
+
+/**
+ * 联机五子棋：host 执黑先手，guest 执白。
+ * 只同步落子坐标，棋盘由两端使用同一个确定性引擎推进。
+ */
+class GomokuMatch(
+    val localMark: Int,
+) {
+    private var engine = GomokuEngine()
+
+    val board: List<Int> get() = engine.board
+    val currentPlayer: Int get() = engine.currentPlayer
+    val winner: Int get() = engine.winner
+    val isDraw: Boolean get() = engine.isDraw
+    val lastMove: GomokuMove? get() = engine.lastMove
+    val winningLine: List<GomokuPoint> get() = engine.winningLine
+    val isGameOver: Boolean get() = engine.isGameOver
+
+    fun isLocalTurn(): Boolean = !engine.isGameOver && engine.currentPlayer == localMark
+
+    fun playLocal(row: Int, column: Int): Boolean {
+        if (!isLocalTurn()) return false
+        return engine.place(row, column)
+    }
+
+    fun playRemote(row: Int, column: Int): Boolean {
+        if (engine.isGameOver) return false
+        return engine.place(row, column)
+    }
+
+    fun reset() {
+        engine = GomokuEngine()
     }
 }

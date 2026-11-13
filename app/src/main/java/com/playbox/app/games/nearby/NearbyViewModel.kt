@@ -36,6 +36,7 @@ class NearbyViewModel(
     private val hostGuests = linkedMapOf<String, String>()
     private var rouletteEngine: RouletteEngine? = null
     private var tttMatch: TttMatch? = null
+    private var gomokuMatch: GomokuMatch? = null
     private var ballEngine: BallBattleEngine? = null
     private var ballLoopJob: Job? = null
     private var ballRemoteBuild: BallBuild? = null
@@ -135,6 +136,10 @@ class NearbyViewModel(
             onDisconnected = ::onGuestDisconnected,
             onMessage = { message -> handleMessage(message, null) },
             onError = ::showError,
+            onRssi = { rssi ->
+                updateSignal(rssi)
+                if (!_uiState.value.isHost) sendRaw("S|$rssi")
+            },
         )
         client = newClient
         if (!newClient.startScan()) {
@@ -184,6 +189,7 @@ class NearbyViewModel(
             NearbyGame.TIC_TAC_TOE -> NearbyStage.TIC_TAC_TOE
             NearbyGame.BOMB -> NearbyStage.BOMB
             NearbyGame.BALL -> NearbyStage.BALL
+            NearbyGame.GOMOKU -> NearbyStage.GOMOKU
         }
         if (state.isHost) lockRoomForGame()
         _uiState.update {
@@ -195,6 +201,7 @@ class NearbyViewModel(
                 ttt = TttUiState(),
                 bomb = BombUiState(),
                 ball = NearbyBallUiState(),
+                gomoku = NearbyGomokuUiState(),
                 error = null,
             )
         }
@@ -204,6 +211,7 @@ class NearbyViewModel(
             NearbyGame.ROULETTE -> if (state.isHost) startRouletteHost()
             NearbyGame.BOMB -> startBombHost()
             NearbyGame.BALL -> Unit
+            NearbyGame.GOMOKU -> if (state.isHost) startGomokuMatch(GOMOKU_BLACK)
             NearbyGame.RPS -> Unit
         }
     }
@@ -619,6 +627,50 @@ class NearbyViewModel(
         }
     }
 
+    fun selectGomokuCell(index: Int) {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.GOMOKU) return
+        val row = index / 15
+        val column = index % 15
+        val match = gomokuMatch ?: return
+        if (!match.isLocalTurn()) return
+        if (!match.playLocal(row, column)) return
+        sendReliable("GM|$row|$column")
+        syncGomoku()
+    }
+
+    fun nextGomokuRound() {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.GOMOKU || !state.gomoku.isGameOver) return
+        gomokuMatch?.reset()
+        sendReliable("GN")
+        syncGomoku()
+    }
+
+    private fun startGomokuMatch(localMark: Int) {
+        gomokuMatch = GomokuMatch(localMark)
+        syncGomoku()
+    }
+
+    private fun syncGomoku() {
+        val match = gomokuMatch ?: return
+        _uiState.update {
+            it.copy(
+                stage = NearbyStage.GOMOKU,
+                game = NearbyGame.GOMOKU,
+                gomoku = NearbyGomokuUiState(
+                    board = match.board,
+                    currentPlayer = match.currentPlayer,
+                    winner = match.winner,
+                    isDraw = match.isDraw,
+                    lastMove = match.lastMove,
+                    winningLine = match.winningLine,
+                ),
+                error = null,
+            )
+        }
+    }
+
     private fun startRouletteHost() {
         rouletteEngine = RouletteEngine()
         _uiState.update {
@@ -803,6 +855,7 @@ class NearbyViewModel(
                     NearbyGame.TIC_TAC_TOE -> NearbyStage.TIC_TAC_TOE
                     NearbyGame.BOMB -> NearbyStage.BOMB
                     NearbyGame.BALL -> NearbyStage.BALL
+                    NearbyGame.GOMOKU -> NearbyStage.GOMOKU
                 }
                 if (_uiState.value.stage == stage && _uiState.value.game == game) return@let
                 if (_uiState.value.isHost) lockRoomForGame()
@@ -815,11 +868,30 @@ class NearbyViewModel(
                         ttt = TttUiState(),
                         bomb = BombUiState(),
                         ball = NearbyBallUiState(),
+                        gomoku = NearbyGomokuUiState(),
                         error = null,
                     )
                 }
                 if (game == NearbyGame.TIC_TAC_TOE) startTttMatch()
+                if (game == NearbyGame.GOMOKU) startGomokuMatch(GOMOKU_WHITE)
                 if (game == NearbyGame.ROULETTE && _uiState.value.isHost) startRouletteHost()
+            }
+            "S" -> {
+                if (_uiState.value.isHost) {
+                    parts.getOrNull(1)?.toIntOrNull()?.let(::updateSignal)
+                }
+            }
+            "GM" -> {
+                if (_uiState.value.stage != NearbyStage.GOMOKU) return
+                val row = parts.getOrNull(1)?.toIntOrNull() ?: return
+                val column = parts.getOrNull(2)?.toIntOrNull() ?: return
+                gomokuMatch?.playRemote(row, column)
+                syncGomoku()
+            }
+            "GN" -> {
+                if (_uiState.value.stage != NearbyStage.GOMOKU) return
+                gomokuMatch?.reset()
+                syncGomoku()
             }
             "C" -> {
                 val choice = parts.getOrNull(1)?.let(RpsChoice::fromWire) ?: return
@@ -987,6 +1059,15 @@ class NearbyViewModel(
         val job: Job? = null,
     )
 
+    private fun updateSignal(rssi: Int) {
+        _uiState.update {
+            it.copy(
+                signalRssi = rssi,
+                signalQuality = signalQualityFor(rssi),
+            )
+        }
+    }
+
     private fun showError(message: String) {
         _uiState.update { it.copy(error = message) }
     }
@@ -994,6 +1075,7 @@ class NearbyViewModel(
     private fun resetGameState() {
         rouletteEngine = null
         tttMatch = null
+        gomokuMatch = null
         stopBallBattle()
         ballRemoteBuild = null
         ballSeed = null
@@ -1004,6 +1086,7 @@ class NearbyViewModel(
                 rps = RpsUiState(),
                 roulette = RouletteUiState(),
                 ttt = TttUiState(),
+                gomoku = NearbyGomokuUiState(),
                 bomb = BombUiState(),
                 ball = NearbyBallUiState(),
             )
@@ -1034,6 +1117,9 @@ class NearbyViewModel(
     }
 
     companion object {
+        private const val GOMOKU_BLACK = 1
+        private const val GOMOKU_WHITE = 2
+
         fun factory(
             application: Application,
             settingsRepository: SettingsRepository,

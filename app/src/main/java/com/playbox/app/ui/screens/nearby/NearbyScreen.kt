@@ -31,7 +31,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SignalCellularAlt
+import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material.icons.filled.Casino
+import androidx.compose.material.icons.filled.BubbleChart
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,6 +68,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -68,6 +79,7 @@ import com.playbox.app.R
 import com.playbox.app.games.ballbattle.BallAttribute
 import com.playbox.app.games.nearby.NearbyGame
 import com.playbox.app.games.nearby.NearbyPeer
+import com.playbox.app.games.nearby.NearbySignalQuality
 import com.playbox.app.games.nearby.NearbyPlayer
 import com.playbox.app.games.nearby.NearbyStage
 import com.playbox.app.games.nearby.NearbyUiState
@@ -238,6 +250,8 @@ fun NearbyRouteScreen(
                     onNextRps = viewModel::nextRpsRound,
                     onTtt = viewModel::selectTttCell,
                     onNextTtt = viewModel::nextTttRound,
+                    onGomokuCell = viewModel::selectGomokuCell,
+                    onNextGomoku = viewModel::nextGomokuRound,
                     onPullRoulette = viewModel::pullRoulette,
                     onRematchRoulette = viewModel::rematchRoulette,
                     onBombGuess = viewModel::submitBombGuess,
@@ -268,6 +282,8 @@ private fun NearbyContent(
     onNextRps: () -> Unit,
     onTtt: (Int) -> Unit,
     onNextTtt: () -> Unit,
+    onGomokuCell: (Int) -> Unit,
+    onNextGomoku: () -> Unit,
     onPullRoulette: () -> Unit,
     onRematchRoulette: () -> Unit,
     onBombGuess: (Int) -> Unit,
@@ -279,6 +295,14 @@ private fun NearbyContent(
     onLeaveBall: () -> Unit,
     onRoomNameChange: (String) -> Unit,
 ) {
+    if (state.stage != NearbyStage.IDLE &&
+        state.stage != NearbyStage.HOSTING &&
+        state.stage != NearbyStage.SCANNING &&
+        state.stage != NearbyStage.CONNECTING
+    ) {
+        SignalQualityChip(state.signalQuality, state.signalRssi)
+        Spacer(modifier = Modifier.height(10.dp))
+    }
     when (state.stage) {
         NearbyStage.IDLE -> NearbyLobby(
             state = state,
@@ -317,6 +341,12 @@ private fun NearbyContent(
             state = state,
             onCell = onTtt,
             onNext = onNextTtt,
+            onDisconnect = onDisconnect,
+        )
+        NearbyStage.GOMOKU -> NearbyGomokuContent(
+            state = state,
+            onCell = onGomokuCell,
+            onNext = onNextGomoku,
             onDisconnect = onDisconnect,
         )
         NearbyStage.ROULETTE -> RouletteContent(
@@ -376,12 +406,14 @@ private fun NearbyLobby(
         title = "创建房间",
         description = "广播一个临时房间，等待附近玩家加入。",
         onClick = onHost,
+        icon = Icons.Filled.AddCircle,
     )
     Spacer(modifier = Modifier.height(12.dp))
     GameEntryCard(
         title = "寻找附近玩家",
         description = "扫描附近正在广播的 100Games 房间。",
         onClick = onScan,
+        icon = Icons.Filled.Search,
     )
 }
 
@@ -472,9 +504,16 @@ private fun ConnectedLobby(
 ) {
     InfoCard(
         title = "已连接 ${state.playerCount} 人",
-        message = "${state.connectedPeer.orEmpty()} · ${if (state.isHost) "房主" else "客人"}",
+        message = "房间「${state.roomName}」· ${state.connectedPeer.orEmpty()} · ${if (state.isHost) "房主" else "客人"}",
     )
     Spacer(modifier = Modifier.height(16.dp))
+    Text(
+        text = if (state.playerCount >= 3) "多人游戏" else "选择双人游戏",
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(modifier = Modifier.height(10.dp))
     if (state.playerCount >= 3) {
         if (state.isHost) {
             GameEntryCard(
@@ -482,6 +521,7 @@ private fun ConnectedLobby(
                 description = "3–6 人轮流猜 1–100，踩中炸弹的玩家出局。",
                 onClick = { onChooseGame(NearbyGame.BOMB) },
                 centered = true,
+                icon = Icons.Filled.Groups,
             )
         } else {
             InfoCard(
@@ -489,12 +529,26 @@ private fun ConnectedLobby(
                 message = "房主会在人数到齐后选择多人数字炸弹。",
             )
         }
+    } else if (!state.isHost) {
+        InfoCard(
+            title = "等待房主选择游戏",
+            message = "房主开始游戏后，你会自动进入对应界面。",
+        )
     } else {
         GameEntryCard(
             title = "石头剪子布",
             description = "同时出拳，一局定胜负。",
             onClick = { onChooseGame(NearbyGame.RPS) },
             centered = true,
+            icon = Icons.Filled.SportsEsports,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        GameEntryCard(
+            title = "联机五子棋",
+            description = "15×15 棋盘，轮流落子，先连成五子者获胜。",
+            onClick = { onChooseGame(NearbyGame.GOMOKU) },
+            centered = true,
+            icon = Icons.Filled.GridOn,
         )
         Spacer(modifier = Modifier.height(12.dp))
         GameEntryCard(
@@ -502,6 +556,7 @@ private fun ConnectedLobby(
             description = "轮流落子，先连成三子者获胜。",
             onClick = { onChooseGame(NearbyGame.TIC_TAC_TOE) },
             centered = true,
+            icon = Icons.Filled.Apps,
         )
         Spacer(modifier = Modifier.height(12.dp))
         GameEntryCard(
@@ -509,6 +564,7 @@ private fun ConnectedLobby(
             description = "各自加点，两个自定义球碰撞决胜负。",
             onClick = { onChooseGame(NearbyGame.BALL) },
             centered = true,
+            icon = Icons.Filled.BubbleChart,
         )
         Spacer(modifier = Modifier.height(12.dp))
         GameEntryCard(
@@ -516,6 +572,7 @@ private fun ConnectedLobby(
             description = "6 个弹巢，轮流扣动，纯虚拟娱乐。",
             onClick = { onChooseGame(NearbyGame.ROULETTE) },
             centered = true,
+            icon = Icons.Filled.Casino,
         )
     }
     Spacer(modifier = Modifier.height(12.dp))
@@ -722,11 +779,64 @@ private fun RouletteContent(
 }
 
 @Composable
+private fun SignalQualityChip(
+    quality: NearbySignalQuality,
+    rssi: Int?,
+) {
+    val color = when (quality) {
+        NearbySignalQuality.GOOD -> Color(0xFF4CAF50)
+        NearbySignalQuality.FAIR -> Color(0xFFFFB300)
+        NearbySignalQuality.POOR -> Color(0xFFE53935)
+        NearbySignalQuality.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val label = when (quality) {
+        NearbySignalQuality.GOOD -> "信号良好"
+        NearbySignalQuality.FAIR -> "信号一般"
+        NearbySignalQuality.POOR -> "信号较差"
+        NearbySignalQuality.UNKNOWN -> "信号检测中"
+    }
+    Surface(
+        color = color.copy(alpha = 0.14f),
+        shape = RoundedCornerShape(50),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.SignalCellularAlt,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.width(7.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = color,
+                fontWeight = FontWeight.SemiBold,
+            )
+            rssi?.let {
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "$it dBm",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun GameEntryCard(
     title: String,
     description: String,
     onClick: () -> Unit,
     centered: Boolean = false,
+    icon: ImageVector = Icons.Filled.Person,
 ) {
     SoftCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         if (centered) {
@@ -737,7 +847,7 @@ private fun GameEntryCard(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Person,
+                    imageVector = icon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                 )
@@ -770,7 +880,7 @@ private fun GameEntryCard(
                     )
                 }
                 Icon(
-                    imageVector = Icons.Filled.Person,
+                    imageVector = icon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                 )

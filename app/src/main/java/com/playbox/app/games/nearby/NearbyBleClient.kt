@@ -15,6 +15,8 @@ import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelUuid
 import java.util.ArrayDeque
 
@@ -26,6 +28,7 @@ class NearbyBleClient(
     private val onDisconnected: () -> Unit,
     private val onMessage: (String) -> Unit,
     private val onError: (String) -> Unit,
+    private val onRssi: (Int) -> Unit = {},
 ) {
     private val appContext = context.applicationContext
     private val manager = appContext.getSystemService(BluetoothManager::class.java)
@@ -36,6 +39,14 @@ class NearbyBleClient(
     private val peers = linkedMapOf<String, NearbyPeer>()
     private val writeQueue = ArrayDeque<String>()
     private var writeInFlight = false
+    private val handler = Handler(Looper.getMainLooper())
+    private val rssiPoll = object : Runnable {
+        override fun run() {
+            val current = gatt ?: return
+            runCatching { current.readRemoteRssi() }
+            handler.postDelayed(this, RSSI_POLL_MS)
+        }
+    }
 
     fun startScan(): Boolean {
         val adapter = adapter ?: run {
@@ -145,6 +156,7 @@ class NearbyBleClient(
         runCatching { gatt?.close() }
         gatt = null
         characteristic = null
+        handler.removeCallbacks(rssiPoll)
     }
 
     private val scanCallback = object : ScanCallback() {
@@ -179,6 +191,7 @@ class NearbyBleClient(
             } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
                 clearWriteQueue()
                 characteristic = null
+                handler.removeCallbacks(rssiPoll)
                 runCatching { gatt.close() }
                 onDisconnected()
             }
@@ -228,7 +241,13 @@ class NearbyBleClient(
                     gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
                 }
                 onConnected(peerName(gatt.device))
+                handler.removeCallbacks(rssiPoll)
+                handler.post(rssiPoll)
             }
+        }
+
+        override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
+            if (status == BluetoothGatt.GATT_SUCCESS) onRssi(rssi)
         }
 
         override fun onCharacteristicWrite(
@@ -262,6 +281,10 @@ class NearbyBleClient(
             val value = characteristic.value ?: return
             onMessage(String(value, Charsets.UTF_8))
         }
+    }
+
+    companion object {
+        private const val RSSI_POLL_MS = 2_500L
     }
 
     private fun peerName(device: BluetoothDevice): String {
