@@ -10,7 +10,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +48,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.playbox.app.AppContainer
 import com.playbox.app.ui.components.game.ExitGameConfirmDialog
 import com.playbox.app.ui.components.game.GameBoardFrame
+import com.playbox.app.ui.components.game.GameButtonContent
 import com.playbox.app.ui.components.game.GameContentContainer
 import com.playbox.app.ui.components.game.GameHelpSheet
 import com.playbox.app.ui.components.game.GameReadyOverlay
@@ -172,15 +178,19 @@ fun ChessRouteScreen(
                                 !state.isAiThinking &&
                                 !state.isGameOver &&
                                 !state.showResult,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp),
                         ) {
-                            Text("悔棋")
+                            GameButtonContent(Icons.Filled.KeyboardArrowLeft, "悔棋")
                         }
                         FilledTonalButton(
                             onClick = viewModel::restart,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp),
                         ) {
-                            Text("重新开局")
+                            GameButtonContent(Icons.Filled.Refresh, "重新开局")
                         }
                     }
                 }
@@ -270,7 +280,8 @@ private fun PromotionDialog(
                         onClick = { onSelect(type) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(
+                        GameButtonContent(
+                            icon = Icons.Filled.Check,
                             text = when (type) {
                                 ChessPieceType.QUEEN -> "后（Queen）"
                                 ChessPieceType.ROOK -> "车（Rook）"
@@ -278,7 +289,6 @@ private fun PromotionDialog(
                                 ChessPieceType.KNIGHT -> "马（Knight）"
                                 else -> type.name
                             },
-                            style = MaterialTheme.typography.titleMedium,
                         )
                     }
                 }

@@ -6,11 +6,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,8 +21,16 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,6 +51,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.playbox.app.AppContainer
 import com.playbox.app.ui.components.game.ExitGameConfirmDialog
+import com.playbox.app.ui.components.game.GameButtonContent
 import com.playbox.app.ui.components.game.GameContentContainer
 import com.playbox.app.ui.components.game.GameHelpSheet
 import com.playbox.app.ui.components.game.GameReadyOverlay
@@ -264,13 +275,31 @@ private fun Opponents(state: DdzUiState) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Column {
-                        Text(
-                            text = "电脑$player",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint = if (current || bidding) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "电脑$player",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
                         if (state.landlord == player) {
-                            Text("地主", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Filled.Star,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(12.dp),
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                )
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text("地主", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
+                            }
                         }
                     }
                     Text(
@@ -371,15 +400,20 @@ private fun BidControls(state: DdzUiState, onBid: (Int) -> Unit) {
         OutlinedButton(
             onClick = { onBid(0) },
             enabled = state.currentBidder == 0 && !state.isAiThinking,
-            modifier = Modifier.weight(1f),
-        ) { Text("不叫") }
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+        ) { GameButtonContent(Icons.Filled.Clear, "不叫") }
         for (points in 1..3) {
             Button(
                 onClick = { onBid(points) },
                 enabled = state.currentBidder == 0 && !state.isAiThinking && points > state.highestBid,
-                modifier = Modifier.weight(1f),
-                contentPadding = ButtonDefaults.ContentPadding,
-            ) { Text("$points 分") }
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+            ) { GameButtonContent(Icons.Filled.Check, "$points 分") }
         }
     }
 }
@@ -398,18 +432,24 @@ private fun PlayControls(
         OutlinedButton(
             onClick = onHint,
             enabled = state.humanTurn && !state.isAiThinking,
-            modifier = Modifier.weight(1f),
-        ) { Text("提示") }
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp),
+        ) { GameButtonContent(Icons.Filled.Info, "提示") }
         OutlinedButton(
             onClick = onPass,
             enabled = state.canPass && !state.isAiThinking,
-            modifier = Modifier.weight(1f),
-        ) { Text("不要") }
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 48.dp),
+        ) { GameButtonContent(Icons.Filled.Clear, "不要") }
         Button(
             onClick = onPlay,
             enabled = state.humanTurn && !state.isAiThinking && state.selectedCombo != null,
-            modifier = Modifier.weight(1.2f),
-        ) { Text("出牌") }
+            modifier = Modifier
+                .weight(1.2f)
+                .heightIn(min = 48.dp),
+        ) { GameButtonContent(Icons.Filled.PlayArrow, "出牌") }
     }
 }
 

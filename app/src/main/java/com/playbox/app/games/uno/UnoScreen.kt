@@ -6,12 +6,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,9 +21,15 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -45,6 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.playbox.app.AppContainer
 import com.playbox.app.ui.components.game.ExitGameConfirmDialog
+import com.playbox.app.ui.components.game.GameButtonContent
 import com.playbox.app.ui.components.game.GameContentContainer
 import com.playbox.app.ui.components.game.GameHelpSheet
 import com.playbox.app.ui.components.game.GameReadyOverlay
@@ -238,29 +247,38 @@ fun UnoRouteScreen(
                     OutlinedButton(
                         onClick = viewModel::drawCard,
                         enabled = state.humanTurn && !state.hasDrawnThisTurn && !state.isGameOver,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                     ) {
-                        Text("抽牌")
+                        GameButtonContent(Icons.Filled.Add, "抽牌")
                     }
                     if (state.hasDrawnThisTurn && state.humanTurn) {
                         OutlinedButton(
                             onClick = viewModel::endTurnAfterDraw,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                         ) {
-                            Text("结束回合")
+                            GameButtonContent(Icons.Filled.Check, "结束回合")
                         }
                     }
                     val canCallUno = state.humanTurn && state.hand.size == 2 && !state.unoDeclared
                     Button(
                         onClick = viewModel::callUno,
                         enabled = canCallUno,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.tertiary,
                             contentColor = MaterialTheme.colorScheme.onTertiary,
                         ),
                     ) {
-                        Text(if (state.unoDeclared) "UNO!" else "喊 UNO")
+                        GameButtonContent(Icons.Filled.Star, if (state.unoDeclared) "UNO!" else "喊 UNO")
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
@@ -337,11 +355,20 @@ private fun OpponentRow(state: UnoUiState) {
                     modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(
-                        text = "电脑$player",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (current) FontWeight.Bold else FontWeight.Normal,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Filled.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = if (current) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "电脑$player",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (current) FontWeight.Bold else FontWeight.Normal,
+                        )
+                    }
                     Text(
                         text = "${state.counts.getOrElse(player) { 0 }} 张",
                         style = MaterialTheme.typography.titleSmall,
@@ -464,7 +491,7 @@ private fun ColorPickerDialog(
                             contentColor = if (color == UnoColor.YELLOW) Color.Black else Color.White,
                         ),
                     ) {
-                        Text(colorLabel(color))
+                        GameButtonContent(Icons.Filled.Check, colorLabel(color))
                     }
                 }
             }
