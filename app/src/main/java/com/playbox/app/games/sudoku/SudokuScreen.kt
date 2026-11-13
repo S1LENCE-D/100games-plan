@@ -62,7 +62,7 @@ fun SudokuRouteScreen(
     onExit: () -> Unit,
 ) {
     val viewModel: SudokuViewModel = viewModel(
-        factory = SudokuViewModel.factory(container.gameStatsRepository),
+        factory = SudokuViewModel.factory(container.gameStatsRepository, container.gameSaveRepository),
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val bestScore by viewModel.bestScore.collectAsStateWithLifecycle()
@@ -93,6 +93,7 @@ fun SudokuRouteScreen(
             GameStatusItem(label = "时间", value = "${uiState.elapsedSeconds}s"),
             GameStatusItem(label = "错误", value = uiState.mistakes.toString()),
         ),
+        onSaveRequest = if (uiState.hasStarted && !uiState.isGameOver) viewModel::saveGame else null,
         onHelpRequest = {
             if (uiState.hasStarted && !uiState.isGameOver && !uiState.isPaused) {
                 viewModel.togglePause()

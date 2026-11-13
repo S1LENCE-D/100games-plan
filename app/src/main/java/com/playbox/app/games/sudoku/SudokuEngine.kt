@@ -30,6 +30,14 @@ enum class SudokuDifficulty(
 }
 
 @Serializable
+data class SudokuSnapshot(
+    val difficulty: SudokuDifficulty,
+    val cells: List<SudokuCell>,
+    val mistakes: Int,
+    val completed: Boolean,
+)
+
+@Serializable
 data class SudokuCell(
     val value: Int = 0,
     val given: Boolean = false,
@@ -100,6 +108,13 @@ class SudokuEngine private constructor(
         return true
     }
 
+    fun snapshot(): SudokuSnapshot = SudokuSnapshot(
+        difficulty = difficulty,
+        cells = cells.toList(),
+        mistakes = mistakes,
+        completed = completed,
+    )
+
     fun isCorrect(row: Int, column: Int): Boolean {
         val index = index(row, column)
         val cell = cells.getOrNull(index) ?: return false
@@ -113,6 +128,13 @@ class SudokuEngine private constructor(
     private fun index(row: Int, column: Int): Int = row * 9 + column
 
     companion object {
+        fun restore(snapshot: SudokuSnapshot): SudokuEngine = SudokuEngine(
+            difficulty = snapshot.difficulty,
+            cells = snapshot.cells.toMutableList(),
+            mistakes = snapshot.mistakes,
+            completed = snapshot.completed,
+        )
+
         fun newGame(difficulty: SudokuDifficulty = SudokuDifficulty.EASY): SudokuEngine {
             val cells = difficulty.puzzle.mapIndexed { index, character ->
                 val value = character.digitToInt()

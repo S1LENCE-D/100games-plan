@@ -3,6 +3,7 @@ package com.playbox.app.ui.screens.home
 import androidx.compose.runtime.Immutable
 import com.playbox.app.domain.model.Achievement
 import com.playbox.app.domain.model.AchievementProgress
+import com.playbox.app.domain.model.GameCategory
 import com.playbox.app.domain.model.GameInfo
 
 enum class HomeFilter(val label: String) {
@@ -20,9 +21,18 @@ data class HomeGameItem(
 )
 
 @Immutable
+data class HomeSection(
+    val category: GameCategory,
+    val title: String,
+    val games: List<HomeGameItem>,
+)
+
+@Immutable
 data class HomeUiState(
     val isLoading: Boolean = true,
     val filter: HomeFilter = HomeFilter.ALL,
+    val query: String = "",
+    val sections: List<HomeSection> = emptyList(),
     val games: List<HomeGameItem> = emptyList(),
     val totalPlays: Int = 0,
     val achievements: List<AchievementProgress> = Achievement.entries.map {

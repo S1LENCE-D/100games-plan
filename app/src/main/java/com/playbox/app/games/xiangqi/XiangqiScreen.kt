@@ -90,7 +90,7 @@ fun XiangqiRouteScreen(
     onExit: () -> Unit,
 ) {
     val viewModel: XiangqiViewModel = viewModel(
-        factory = XiangqiViewModel.factory(container.gameStatsRepository),
+        factory = XiangqiViewModel.factory(container.gameStatsRepository, container.gameSaveRepository),
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val bestScore by viewModel.bestScore.collectAsStateWithLifecycle()
@@ -129,6 +129,11 @@ fun XiangqiRouteScreen(
             GameStatusItem("步数", state.moveCount.toString()),
         ),
         onHelpRequest = { showHelp = true },
+        onSaveRequest = if (state.hasStarted && !state.isGameOver && !state.isAiThinking) {
+            viewModel::saveGame
+        } else {
+            null
+        },
     ) {
         GameContentContainer {
             BoxWithConstraints(

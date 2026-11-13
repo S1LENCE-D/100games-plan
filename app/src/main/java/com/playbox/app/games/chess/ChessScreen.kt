@@ -91,7 +91,7 @@ fun ChessRouteScreen(
     onExit: () -> Unit,
 ) {
     val viewModel: ChessViewModel = viewModel(
-        factory = ChessViewModel.factory(container.gameStatsRepository),
+        factory = ChessViewModel.factory(container.gameStatsRepository, container.gameSaveRepository),
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val bestScore by viewModel.bestScore.collectAsStateWithLifecycle()
@@ -130,6 +130,11 @@ fun ChessRouteScreen(
             GameStatusItem("步数", state.moveCount.toString()),
         ),
         onHelpRequest = { showHelp = true },
+        onSaveRequest = if (state.hasStarted && !state.isGameOver && !state.isAiThinking) {
+            viewModel::saveGame
+        } else {
+            null
+        },
     ) {
         GameContentContainer {
             BoxWithConstraints(

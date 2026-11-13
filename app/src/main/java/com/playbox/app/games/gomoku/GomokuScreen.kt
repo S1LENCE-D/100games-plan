@@ -65,7 +65,7 @@ fun GomokuRouteScreen(
     onExit: () -> Unit,
 ) {
     val viewModel: GomokuViewModel = viewModel(
-        factory = GomokuViewModel.factory(container.gameStatsRepository),
+        factory = GomokuViewModel.factory(container.gameStatsRepository, container.gameSaveRepository),
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val bestScore by viewModel.bestScore.collectAsStateWithLifecycle()
@@ -102,6 +102,11 @@ fun GomokuRouteScreen(
             GameStatusItem("手数", state.moveCount.toString()),
         ),
         onHelpRequest = { showHelp = true },
+        onSaveRequest = if (state.hasStarted && !state.isGameOver && !state.isAiThinking) {
+            viewModel::saveGame
+        } else {
+            null
+        },
     ) {
         GameContentContainer {
             BoxWithConstraints(

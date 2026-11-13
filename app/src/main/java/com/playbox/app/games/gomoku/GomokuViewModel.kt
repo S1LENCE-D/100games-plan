@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.playbox.app.domain.model.GameId
+import com.playbox.app.domain.repository.GameSaveRepository
 import com.playbox.app.domain.repository.GameStatsRepository
 import com.playbox.app.feedback.FeedbackController
 import com.playbox.app.games.common.BaseGameViewModel
@@ -17,9 +18,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
+@Serializable
+private data class SavedGomoku(
+    val snapshot: GomokuSnapshot,
+    val mode: GomokuMode,
+    val humanColor: Int,
+)
 
 class GomokuViewModel(
     statsRepository: GameStatsRepository,
+    private val saveRepository: GameSaveRepository,
     savedStateHandle: SavedStateHandle,
 ) : BaseGameViewModel(
     gameId = GameId.GOMOKU,
@@ -29,8 +41,13 @@ class GomokuViewModel(
     private var engine = GomokuEngine()
     private var aiJob: Job? = null
     private var finishHandled = false
+    private val json = Json { ignoreUnknownKeys = true }
 
     private val _uiState = MutableStateFlow(GomokuUiState())
+
+    init {
+        viewModelScope.launch { restorePersistentSave() }
+    }
     val uiState: StateFlow<GomokuUiState> = _uiState.asStateFlow()
 
     fun selectMode(mode: GomokuMode) {
@@ -56,6 +73,7 @@ class GomokuViewModel(
             hasStarted = true,
         )
         markGameOpenedOnce()
+        clearPersistentSave()
         if (state.mode == GomokuMode.AI && state.humanColor == GOMOKU_WHITE) {
             triggerAi()
         }
@@ -105,6 +123,51 @@ class GomokuViewModel(
         startGame()
     }
 
+    fun saveGame() {
+        val state = _uiState.value
+        if (!state.hasStarted || state.isGameOver || state.isAiThinking) return
+        val saved = SavedGomoku(
+            snapshot = engine.snapshot(),
+            mode = state.mode,
+            humanColor = state.humanColor,
+        )
+        viewModelScope.launch {
+            runCatching { saveRepository.save(gameId, json.encodeToString(saved)) }
+                .onFailure { throwable ->
+                    com.playbox.app.diagnostics.AppLogger.warn("Save", "保存五子棋进度失败", throwable)
+                }
+        }
+    }
+
+    private suspend fun restorePersistentSave() {
+        if (_uiState.value.hasStarted) return
+        val raw = runCatching { saveRepository.load(gameId) }.getOrNull() ?: return
+        val saved = runCatching { json.decodeFromString<SavedGomoku>(raw) }.getOrNull() ?: return
+        if (saved.snapshot.winner != 0) {
+            runCatching { saveRepository.clear(gameId) }
+            return
+        }
+        engine = GomokuEngine.restore(saved.snapshot)
+        _uiState.value = GomokuUiState(
+            board = engine.board,
+            mode = saved.mode,
+            humanColor = saved.humanColor,
+            currentPlayer = engine.currentPlayer,
+            winner = engine.winner,
+            winningLine = engine.winningLine,
+            lastMove = engine.lastMove,
+            moveCount = engine.moveCount,
+            hasStarted = true,
+        )
+        if (saved.mode == GomokuMode.AI && engine.currentPlayer != saved.humanColor) {
+            triggerAi()
+        }
+    }
+
+    private fun clearPersistentSave() {
+        viewModelScope.launch { runCatching { saveRepository.clear(gameId) } }
+    }
+
     private fun triggerAi() {
         if (_uiState.value.mode != GomokuMode.AI) return
         aiJob?.cancel()
@@ -152,20 +215,26 @@ class GomokuViewModel(
         _uiState.update { it.copy(score = score, isAiThinking = false) }
         if (state.mode == GomokuMode.AI) {
             viewModelScope.launch {
+                clearPersistentSave()
                 val isNewRecord = if (score > 0) persistFinishedGame(score) else false
                 _uiState.update { it.copy(showResult = true, isNewRecord = isNewRecord) }
             }
         } else {
+            clearPersistentSave()
             _uiState.update { it.copy(showResult = true) }
         }
     }
 
     companion object {
-        fun factory(statsRepository: GameStatsRepository): ViewModelProvider.Factory =
+        fun factory(
+            statsRepository: GameStatsRepository,
+            saveRepository: GameSaveRepository,
+        ): ViewModelProvider.Factory =
             viewModelFactory {
                 initializer {
                     GomokuViewModel(
                         statsRepository = statsRepository,
+                        saveRepository = saveRepository,
                         savedStateHandle = createSavedStateHandle(),
                     )
                 }

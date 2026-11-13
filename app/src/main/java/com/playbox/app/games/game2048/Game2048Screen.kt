@@ -74,7 +74,7 @@ fun Game2048RouteScreen(
     onExit: () -> Unit,
 ) {
     val viewModel: Game2048ViewModel = viewModel(
-        factory = Game2048ViewModel.factory(container.gameStatsRepository),
+        factory = Game2048ViewModel.factory(container.gameStatsRepository, container.gameSaveRepository),
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val bestScore by viewModel.bestScore.collectAsStateWithLifecycle()
@@ -112,6 +112,7 @@ fun Game2048RouteScreen(
             }
             showHelp = true
         },
+        onSaveRequest = if (uiState.hasStarted && !uiState.isGameOver) viewModel::saveGame else null,
     ) {
         GameContentContainer {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {

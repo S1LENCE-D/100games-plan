@@ -1,8 +1,10 @@
 package com.playbox.app.games.xiangqi
 
 import androidx.compose.runtime.Immutable
+import kotlinx.serialization.Serializable
 import kotlin.math.abs
 
+@Serializable
 enum class XiangqiColor {
     RED,
     BLACK;
@@ -10,6 +12,7 @@ enum class XiangqiColor {
     fun other(): XiangqiColor = if (this == RED) BLACK else RED
 }
 
+@Serializable
 enum class XiangqiPieceType {
     GENERAL,
     ADVISOR,
@@ -21,12 +24,14 @@ enum class XiangqiPieceType {
 }
 
 @Immutable
+@Serializable
 data class XiangqiPiece(
     val type: XiangqiPieceType,
     val color: XiangqiColor,
 )
 
 @Immutable
+@Serializable
 data class XiangqiPoint(
     val row: Int,
     val column: Int,
@@ -35,11 +40,13 @@ data class XiangqiPoint(
 }
 
 @Immutable
+@Serializable
 data class XiangqiMove(
     val from: XiangqiPoint,
     val to: XiangqiPoint,
 )
 
+@Serializable
 enum class XiangqiOutcome {
     ONGOING,
     CHECKMATE,
@@ -49,6 +56,7 @@ enum class XiangqiOutcome {
 }
 
 @Immutable
+@Serializable
 data class XiangqiStatus(
     val outcome: XiangqiOutcome,
     val winner: XiangqiColor?,
@@ -62,6 +70,14 @@ private data class MoveRecord(
     val sideBefore: XiangqiColor,
     val noCaptureBefore: Int,
     val lastMoveBefore: XiangqiMove?,
+)
+
+@Serializable
+data class XiangqiSnapshot(
+    val board: List<XiangqiPiece?>,
+    val sideToMove: XiangqiColor,
+    val noCapturePlies: Int,
+    val lastMove: XiangqiMove?,
 )
 
 class XiangqiEngine private constructor(initialized: Boolean) {
@@ -97,6 +113,13 @@ class XiangqiEngine private constructor(initialized: Boolean) {
         lastMove = copy.lastMove
         status = copy.status
     }
+
+    fun snapshot(): XiangqiSnapshot = XiangqiSnapshot(
+        board = board.toList(),
+        sideToMove = sideToMove,
+        noCapturePlies = noCapturePlies,
+        lastMove = lastMove,
+    )
 
     fun pieceAt(row: Int, column: Int): XiangqiPiece? {
         if (row !in 0..9 || column !in 0..8) return null
@@ -625,6 +648,18 @@ class XiangqiEngine private constructor(initialized: Boolean) {
     }
 
     companion object {
+        fun restore(snapshot: XiangqiSnapshot): XiangqiEngine {
+            val engine = XiangqiEngine(true)
+            engine.board = snapshot.board.toTypedArray()
+            engine.sideToMove = snapshot.sideToMove
+            engine.noCapturePlies = snapshot.noCapturePlies
+            engine.lastMove = snapshot.lastMove
+            engine.positionCounts.clear()
+            engine.positionCounts[engine.positionKey()] = 1
+            engine.updateStatus()
+            return engine
+        }
+
         private const val MATE_SCORE = 100_000
         private val ORTHOGONAL = listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)
         private val DIAGONAL = listOf(1 to 1, 1 to -1, -1 to 1, -1 to -1)

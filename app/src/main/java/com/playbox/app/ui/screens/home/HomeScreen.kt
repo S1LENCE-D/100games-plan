@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,7 +26,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
@@ -37,6 +40,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.SegmentedButton
@@ -60,6 +64,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.playbox.app.AppContainer
@@ -97,6 +103,7 @@ fun HomeRouteScreen(
         onGameClick = onOpenGame,
         onToggleFavorite = viewModel::toggleFavorite,
         onFilterSelected = viewModel::selectFilter,
+        onQueryChange = viewModel::updateQuery,
         onRandomGame = {
             GameCatalog.all.randomOrNull()?.let { game -> onOpenGame(game.id) }
         },
@@ -136,6 +143,7 @@ fun HomeScreen(
     onGameClick: (GameId) -> Unit,
     onToggleFavorite: (GameId) -> Unit,
     onFilterSelected: (HomeFilter) -> Unit,
+    onQueryChange: (String) -> Unit,
     onRandomGame: () -> Unit,
     onOpenNearby: () -> Unit,
 ) {
@@ -233,6 +241,38 @@ fun HomeScreen(
             }
 
             item(
+                key = "search",
+                contentType = "search",
+                span = { GridItemSpan(maxLineSpan) },
+            ) {
+                OutlinedTextField(
+                    value = uiState.query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    singleLine = true,
+                    placeholder = { Text("搜索游戏、玩法或分区") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = null,
+                        )
+                    },
+                    trailingIcon = {
+                        if (uiState.query.isNotEmpty()) {
+                            IconButton(onClick = { onQueryChange("") }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Clear,
+                                    contentDescription = "清除搜索",
+                                )
+                            }
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                )
+            }
+
+            item(
                 key = "filters",
                 contentType = "filters",
                 span = { GridItemSpan(maxLineSpan) },
@@ -299,28 +339,50 @@ fun HomeScreen(
                     ) {
                         val emptyCopy = emptyStateCopy(uiState.filter)
                         EmptyState(
-                            title = emptyCopy.title,
-                            message = emptyCopy.message,
-                            actionLabel = "查看全部游戏",
-                            onAction = { onFilterSelected(HomeFilter.ALL) },
+                            title = if (uiState.query.isNotBlank()) "没有找到游戏" else emptyCopy.title,
+                            message = if (uiState.query.isNotBlank()) {
+                                "换个关键词试试，支持游戏名、玩法或分区。"
+                            } else {
+                                emptyCopy.message
+                            },
+                            actionLabel = if (uiState.query.isNotBlank()) "清除搜索" else "查看全部游戏",
+                            onAction = {
+                                if (uiState.query.isNotBlank()) {
+                                    onQueryChange("")
+                                } else {
+                                    onFilterSelected(HomeFilter.ALL)
+                                }
+                            },
                         )
                     }
                 }
 
                 else -> {
-                    items(
-                        items = uiState.games,
-                        key = { item -> item.game.id.slug },
-                        contentType = { "game" },
-                    ) { item ->
-                        GameCard(
-                            game = item.game,
-                            highScore = item.highScore,
-                            isFavorite = item.isFavorite,
-                            playCount = item.playCount,
-                            onClick = { onGameClick(item.game.id) },
-                            onToggleFavorite = { onToggleFavorite(item.game.id) },
-                        )
+                    uiState.sections.forEach { section ->
+                        item(
+                            key = "section_${section.category.name}",
+                            contentType = "section",
+                            span = { GridItemSpan(maxLineSpan) },
+                        ) {
+                            SectionHeader(
+                                title = section.title,
+                                count = section.games.size,
+                            )
+                        }
+                        items(
+                            items = section.games,
+                            key = { item -> item.game.id.slug },
+                            contentType = { "game" },
+                        ) { item ->
+                            GameCard(
+                                game = item.game,
+                                highScore = item.highScore,
+                                isFavorite = item.isFavorite,
+                                playCount = item.playCount,
+                                onClick = { onGameClick(item.game.id) },
+                                onToggleFavorite = { onToggleFavorite(item.game.id) },
+                            )
+                        }
                     }
                 }
             }
@@ -331,6 +393,27 @@ fun HomeScreen(
         AchievementSheet(
             achievements = uiState.achievements,
             onDismiss = { showAchievements = false },
+        )
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String, count: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = "$count 款",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

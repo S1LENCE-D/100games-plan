@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.playbox.app.diagnostics.AppLogger
 import com.playbox.app.domain.model.GameId
+import com.playbox.app.domain.repository.GameSaveRepository
 import com.playbox.app.domain.repository.GameStatsRepository
 import com.playbox.app.feedback.FeedbackController
 import com.playbox.app.games.common.BaseGameViewModel
@@ -32,6 +33,7 @@ private data class SavedGame2048(
 
 class Game2048ViewModel(
     statsRepository: GameStatsRepository,
+    private val saveRepository: GameSaveRepository,
     savedStateHandle: SavedStateHandle,
 ) : BaseGameViewModel(
     gameId = GameId.GAME_2048,
@@ -54,6 +56,11 @@ class Game2048ViewModel(
 
     init {
         restoreSession()
+        if (!_uiState.value.hasStarted) {
+            viewModelScope.launch {
+                restorePersistentSave()
+            }
+        }
     }
 
     fun startGame() {
@@ -69,6 +76,7 @@ class Game2048ViewModel(
         )
         markGameOpenedOnce()
         persistSession()
+        clearPersistentSave()
     }
 
     fun move(direction: MoveDirection) {
@@ -134,6 +142,7 @@ class Game2048ViewModel(
             hasStarted = true,
         )
         persistSession()
+        clearPersistentSave()
     }
 
     private fun performMove(direction: MoveDirection) {
@@ -183,6 +192,7 @@ class Game2048ViewModel(
         gameOverHandled = true
         FeedbackController.gameOver()
         viewModelScope.launch {
+            clearPersistentSave()
             val newRecord = persistFinishedGame(score = engine.currentScore)
             _uiState.update {
                 it.copy(
@@ -195,6 +205,61 @@ class Game2048ViewModel(
             }
             persistSession()
         }
+    }
+
+    fun saveGame() {
+        val state = _uiState.value
+        if (!state.hasStarted || state.isGameOver) return
+        val raw = currentSessionJson() ?: return
+        viewModelScope.launch {
+            runCatching { saveRepository.save(gameId, raw) }
+                .onFailure { throwable -> AppLogger.warn("Save", "保存 2048 进度失败", throwable) }
+        }
+    }
+
+    private suspend fun restorePersistentSave() {
+        if (_uiState.value.hasStarted) return
+        val raw = runCatching { saveRepository.load(gameId) }.getOrNull() ?: return
+        val saved = runCatching { json.decodeFromString<SavedGame2048>(raw) }.getOrNull() ?: return
+        if (!saved.hasStarted || saved.engine.isGameOver) {
+            runCatching { saveRepository.clear(gameId) }
+            return
+        }
+        restoreSaved(saved, paused = true)
+    }
+
+    private fun restoreSaved(saved: SavedGame2048, paused: Boolean) {
+        engine = Game2048Engine.restore(saved.engine)
+        gameOverHandled = saved.engine.isGameOver
+        _uiState.value = Game2048UiState(
+            tiles = engine.boardTiles,
+            score = engine.currentScore,
+            largestTile = engine.largestTile,
+            hasStarted = true,
+            isPaused = paused || saved.isPaused,
+            isGameOver = saved.engine.isGameOver,
+            canUndo = engine.canUndo,
+            isNewRecord = saved.isNewRecord,
+            showResult = saved.showResult || saved.engine.isGameOver,
+        )
+    }
+
+    private fun currentSessionJson(): String? {
+        val state = _uiState.value
+        if (!state.hasStarted) return null
+        return json.encodeToString(
+            SavedGame2048(
+                engine = engine.snapshot(),
+                hasStarted = state.hasStarted,
+                isPaused = state.isPaused,
+                isNewRecord = state.isNewRecord,
+                showResult = state.showResult,
+            ),
+        )
+    }
+
+    private fun clearPersistentSave() {
+        viewModelScope.launch { runCatching { saveRepository.clear(gameId) } }
     }
 
     private fun persistSession() {
@@ -220,29 +285,21 @@ class Game2048ViewModel(
                 AppLogger.warn("Snapshot", "恢复游戏快照失败：${gameId.slug}", throwable)
             }
             .getOrNull() ?: return
-        engine = Game2048Engine.restore(saved.engine)
-        gameOverHandled = saved.engine.isGameOver
-        _uiState.value = Game2048UiState(
-            tiles = engine.boardTiles,
-            score = engine.currentScore,
-            largestTile = engine.largestTile,
-            hasStarted = saved.hasStarted,
-            isPaused = !saved.engine.isGameOver,
-            isGameOver = saved.engine.isGameOver,
-            canUndo = engine.canUndo,
-            isNewRecord = saved.isNewRecord,
-            showResult = saved.showResult || saved.engine.isGameOver,
-        )
+        restoreSaved(saved, paused = !saved.engine.isGameOver)
     }
 
     companion object {
         private const val SESSION_KEY = "game_2048_session"
 
-        fun factory(statsRepository: GameStatsRepository): ViewModelProvider.Factory =
+        fun factory(
+            statsRepository: GameStatsRepository,
+            saveRepository: GameSaveRepository,
+        ): ViewModelProvider.Factory =
             viewModelFactory {
                 initializer {
                     Game2048ViewModel(
                         statsRepository = statsRepository,
+                        saveRepository = saveRepository,
                         savedStateHandle = createSavedStateHandle(),
                     )
                 }

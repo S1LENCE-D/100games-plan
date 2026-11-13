@@ -1,6 +1,7 @@
 package com.playbox.app.games.gomoku
 
 import androidx.compose.runtime.Immutable
+import kotlinx.serialization.Serializable
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -8,12 +9,14 @@ const val GOMOKU_BOARD_SIZE = 15
 const val GOMOKU_BLACK = 1
 const val GOMOKU_WHITE = 2
 
+@Serializable
 @Immutable
 data class GomokuPoint(
     val row: Int,
     val column: Int,
 )
 
+@Serializable
 @Immutable
 data class GomokuMove(
     val row: Int,
@@ -21,10 +24,22 @@ data class GomokuMove(
     val player: Int,
 )
 
+@Serializable
 enum class GomokuMode {
     AI,
     LOCAL,
 }
+
+@Serializable
+data class GomokuSnapshot(
+    val size: Int,
+    val board: List<Int>,
+    val moves: List<GomokuMove>,
+    val currentPlayer: Int,
+    val winner: Int,
+    val winningLine: List<GomokuPoint>,
+    val lastMove: GomokuMove?,
+)
 
 class GomokuEngine(
     val size: Int = GOMOKU_BOARD_SIZE,
@@ -88,6 +103,16 @@ class GomokuEngine(
         winningLine = emptyList()
         lastMove = null
     }
+
+    fun snapshot(): GomokuSnapshot = GomokuSnapshot(
+        size = size,
+        board = board,
+        moves = moves.toList(),
+        currentPlayer = currentPlayer,
+        winner = winner,
+        winningLine = winningLine,
+        lastMove = lastMove,
+    )
 
     fun aiMove(): GomokuMove? {
         if (isGameOver) return null
@@ -223,6 +248,18 @@ class GomokuEngine(
     }
 
     companion object {
+        fun restore(snapshot: GomokuSnapshot): GomokuEngine {
+            val engine = GomokuEngine(snapshot.size)
+            snapshot.board.forEachIndexed { index, value -> engine.cells[index] = value }
+            engine.moves.clear()
+            engine.moves.addAll(snapshot.moves)
+            engine.currentPlayer = snapshot.currentPlayer
+            engine.winner = snapshot.winner
+            engine.winningLine = snapshot.winningLine
+            engine.lastMove = snapshot.lastMove
+            return engine
+        }
+
         private val DIRECTIONS = listOf(0 to 1, 1 to 0, 1 to 1, 1 to -1)
 
         fun other(player: Int): Int = if (player == GOMOKU_BLACK) GOMOKU_WHITE else GOMOKU_BLACK

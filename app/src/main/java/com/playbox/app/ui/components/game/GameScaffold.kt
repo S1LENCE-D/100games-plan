@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -31,11 +32,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import com.playbox.app.diagnostics.AppLogger
 import com.playbox.app.feedback.FeedbackController
 import com.playbox.app.ui.util.TrackScreen
+import kotlinx.coroutines.launch
 
 @Immutable
 data class GameStatusItem(
@@ -76,6 +82,7 @@ fun GameScaffold(
     bestScoreLabel: String = "最高分",
     extraStats: List<GameStatusItem> = emptyList(),
     onHelpRequest: (() -> Unit)? = null,
+    onSaveRequest: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     TrackScreen("游戏 · $gameName")
@@ -90,12 +97,15 @@ fun GameScaffold(
         AppLogger.info("Game", "$gameName：切换暂停，当前=${if (isPaused) "暂停" else "运行"}")
         onTogglePause()
     }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     BackHandler(onBack = handleBackRequest)
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             Column {
                 TopAppBar(
@@ -115,6 +125,20 @@ fun GameScaffold(
                     }
                 },
                 actions = {
+                    if (onSaveRequest != null) {
+                        IconButton(onClick = {
+                            FeedbackController.tap()
+                            onSaveRequest()
+                            scope.launch {
+                                snackbarHostState.showSnackbar("已保存当前进度")
+                            }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Filled.Save,
+                                contentDescription = "保存游戏",
+                            )
+                        }
+                    }
                     if (onHelpRequest != null) {
                         IconButton(onClick = {
                             FeedbackController.tap()

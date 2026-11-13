@@ -1,10 +1,12 @@
 package com.playbox.app.games.chess
 
 import androidx.compose.runtime.Immutable
+import kotlinx.serialization.Serializable
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
+@Serializable
 enum class ChessColor {
     WHITE,
     BLACK;
@@ -12,6 +14,7 @@ enum class ChessColor {
     fun other(): ChessColor = if (this == WHITE) BLACK else WHITE
 }
 
+@Serializable
 enum class ChessPieceType {
     KING,
     QUEEN,
@@ -22,12 +25,14 @@ enum class ChessPieceType {
 }
 
 @Immutable
+@Serializable
 data class ChessPiece(
     val type: ChessPieceType,
     val color: ChessColor,
 )
 
 @Immutable
+@Serializable
 data class ChessSquare(
     val row: Int,
     val column: Int,
@@ -36,6 +41,7 @@ data class ChessSquare(
 }
 
 @Immutable
+@Serializable
 data class ChessMove(
     val from: ChessSquare,
     val to: ChessSquare,
@@ -44,6 +50,7 @@ data class ChessMove(
     val isEnPassant: Boolean = false,
 )
 
+@Serializable
 enum class ChessOutcome {
     ONGOING,
     CHECKMATE,
@@ -54,6 +61,7 @@ enum class ChessOutcome {
 }
 
 @Immutable
+@Serializable
 data class ChessStatus(
     val outcome: ChessOutcome,
     val winner: ChessColor?,
@@ -61,6 +69,20 @@ data class ChessStatus(
 ) {
     val isGameOver: Boolean get() = outcome != ChessOutcome.ONGOING
 }
+
+@Serializable
+data class ChessSnapshot(
+    val board: List<ChessPiece?>,
+    val sideToMove: ChessColor,
+    val whiteKingSide: Boolean,
+    val whiteQueenSide: Boolean,
+    val blackKingSide: Boolean,
+    val blackQueenSide: Boolean,
+    val enPassantTarget: ChessSquare?,
+    val halfmoveClock: Int,
+    val fullmoveNumber: Int,
+    val lastMove: ChessMove?,
+)
 
 private data class CastleRights(
     val whiteKingSide: Boolean = true,
@@ -120,6 +142,19 @@ class ChessEngine private constructor(initialized: Boolean) {
         lastMove = copy.lastMove
         status = copy.status
     }
+
+    fun snapshot(): ChessSnapshot = ChessSnapshot(
+        board = board.toList(),
+        sideToMove = sideToMove,
+        whiteKingSide = castling.whiteKingSide,
+        whiteQueenSide = castling.whiteQueenSide,
+        blackKingSide = castling.blackKingSide,
+        blackQueenSide = castling.blackQueenSide,
+        enPassantTarget = enPassantTarget,
+        halfmoveClock = halfmoveClock,
+        fullmoveNumber = fullmoveNumber,
+        lastMove = lastMove,
+    )
 
     fun pieceAt(row: Int, column: Int): ChessPiece? {
         if (row !in 0..7 || column !in 0..7) return null
@@ -619,6 +654,26 @@ class ChessEngine private constructor(initialized: Boolean) {
     }
 
     companion object {
+        fun restore(snapshot: ChessSnapshot): ChessEngine {
+            val engine = ChessEngine(true)
+            engine.board = snapshot.board.toTypedArray()
+            engine.sideToMove = snapshot.sideToMove
+            engine.castling = CastleRights(
+                whiteKingSide = snapshot.whiteKingSide,
+                whiteQueenSide = snapshot.whiteQueenSide,
+                blackKingSide = snapshot.blackKingSide,
+                blackQueenSide = snapshot.blackQueenSide,
+            )
+            engine.enPassantTarget = snapshot.enPassantTarget
+            engine.halfmoveClock = snapshot.halfmoveClock
+            engine.fullmoveNumber = snapshot.fullmoveNumber
+            engine.lastMove = snapshot.lastMove
+            engine.positionCounts.clear()
+            engine.positionCounts[engine.positionKey()] = 1
+            engine.updateStatus()
+            return engine
+        }
+
         private const val MATE_SCORE = 100_000
         private val PIECE_VALUES = mapOf(
             ChessPieceType.PAWN to 100,

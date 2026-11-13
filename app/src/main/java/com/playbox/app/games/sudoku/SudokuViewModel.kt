@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.playbox.app.domain.model.GameId
+import com.playbox.app.domain.repository.GameSaveRepository
 import com.playbox.app.domain.repository.GameStatsRepository
 import com.playbox.app.feedback.FeedbackController
 import com.playbox.app.games.common.BaseGameViewModel
@@ -15,9 +16,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
+@Serializable
+private data class SavedSudoku(
+    val snapshot: SudokuSnapshot,
+    val elapsedSeconds: Int,
+    val notesMode: Boolean,
+)
 
 class SudokuViewModel(
     statsRepository: GameStatsRepository,
+    private val saveRepository: GameSaveRepository,
     savedStateHandle: SavedStateHandle,
 ) : BaseGameViewModel(
     gameId = GameId.SUDOKU,
@@ -28,9 +40,16 @@ class SudokuViewModel(
     private var engine = SudokuEngine.newGame(difficulty)
     private var elapsedSeconds = 0
     private var finishHandled = false
+    private val json = Json { ignoreUnknownKeys = true }
 
     private val _uiState = MutableStateFlow(previewState())
     val uiState: StateFlow<SudokuUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            restorePersistentSave()
+        }
+    }
 
     fun selectDifficulty(selected: SudokuDifficulty) {
         if (_uiState.value.hasStarted) return
@@ -47,6 +66,7 @@ class SudokuViewModel(
         finishHandled = false
         _uiState.value = previewState().copy(hasStarted = true)
         markGameOpenedOnce()
+        clearPersistentSave()
         startTimer()
     }
 
@@ -129,6 +149,7 @@ class SudokuViewModel(
         elapsedSeconds = 0
         finishHandled = false
         _uiState.value = previewState().copy(hasStarted = true)
+        clearPersistentSave()
         startTimer()
     }
 
@@ -159,9 +180,52 @@ class SudokuViewModel(
             )
         }
         viewModelScope.launch {
+            clearPersistentSave()
             val isNewRecord = persistFinishedGame(finalScore)
             _uiState.update { it.copy(isNewRecord = isNewRecord, showResult = true) }
         }
+    }
+
+    fun saveGame() {
+        val state = _uiState.value
+        if (!state.hasStarted || state.isGameOver) return
+        val saved = SavedSudoku(
+            snapshot = engine.snapshot(),
+            elapsedSeconds = elapsedSeconds,
+            notesMode = state.notesMode,
+        )
+        viewModelScope.launch {
+            runCatching { saveRepository.save(gameId, json.encodeToString(saved)) }
+                .onFailure { throwable ->
+                    com.playbox.app.diagnostics.AppLogger.warn("Save", "保存数独进度失败", throwable)
+                }
+        }
+    }
+
+    private suspend fun restorePersistentSave() {
+        if (_uiState.value.hasStarted) return
+        val raw = runCatching { saveRepository.load(gameId) }.getOrNull() ?: return
+        val saved = runCatching { json.decodeFromString<SavedSudoku>(raw) }.getOrNull() ?: return
+        if (saved.snapshot.completed) {
+            runCatching { saveRepository.clear(gameId) }
+            return
+        }
+        difficulty = saved.snapshot.difficulty
+        engine = SudokuEngine.restore(saved.snapshot)
+        elapsedSeconds = saved.elapsedSeconds
+        _uiState.value = SudokuUiState(
+            cells = engine.currentCells,
+            difficulty = difficulty,
+            notesMode = saved.notesMode,
+            mistakes = engine.currentMistakes,
+            elapsedSeconds = elapsedSeconds,
+            hasStarted = true,
+            isPaused = true,
+        )
+    }
+
+    private fun clearPersistentSave() {
+        viewModelScope.launch { runCatching { saveRepository.clear(gameId) } }
     }
 
     private fun syncState() {
@@ -181,11 +245,15 @@ class SudokuViewModel(
     )
 
     companion object {
-        fun factory(statsRepository: GameStatsRepository): ViewModelProvider.Factory =
+        fun factory(
+            statsRepository: GameStatsRepository,
+            saveRepository: GameSaveRepository,
+        ): ViewModelProvider.Factory =
             viewModelFactory {
                 initializer {
                     SudokuViewModel(
                         statsRepository = statsRepository,
+                        saveRepository = saveRepository,
                         savedStateHandle = createSavedStateHandle(),
                     )
                 }

@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.playbox.app.domain.model.GameId
+import com.playbox.app.domain.repository.GameSaveRepository
 import com.playbox.app.domain.repository.GameStatsRepository
 import com.playbox.app.feedback.FeedbackController
 import com.playbox.app.games.common.BaseGameViewModel
@@ -19,9 +20,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
+@Serializable
+private data class SavedChess(
+    val snapshot: ChessSnapshot,
+    val mode: ChessMode,
+    val humanColor: ChessColor,
+)
 
 class ChessViewModel(
     statsRepository: GameStatsRepository,
+    private val saveRepository: GameSaveRepository,
     savedStateHandle: SavedStateHandle,
 ) : BaseGameViewModel(
     gameId = GameId.CHESS,
@@ -31,8 +43,13 @@ class ChessViewModel(
     private var engine = ChessEngine()
     private var aiJob: Job? = null
     private var finishHandled = false
+    private val json = Json { ignoreUnknownKeys = true }
 
     private val _uiState = MutableStateFlow(ChessUiState())
+
+    init {
+        viewModelScope.launch { restorePersistentSave() }
+    }
     val uiState: StateFlow<ChessUiState> = _uiState.asStateFlow()
 
     fun selectMode(mode: ChessMode) {
@@ -62,6 +79,7 @@ class ChessViewModel(
             hasStarted = true,
         )
         markGameOpenedOnce()
+        clearPersistentSave()
         if (selectedMode == ChessMode.AI && selectedColor == ChessColor.BLACK) {
             triggerAi()
         }
@@ -143,6 +161,52 @@ class ChessViewModel(
     fun restart() {
         aiJob?.cancel()
         startGame()
+    }
+
+    fun saveGame() {
+        val state = _uiState.value
+        if (!state.hasStarted || state.isGameOver || state.isAiThinking) return
+        val saved = SavedChess(
+            snapshot = engine.snapshot(),
+            mode = state.mode,
+            humanColor = state.humanColor,
+        )
+        viewModelScope.launch {
+            runCatching { saveRepository.save(gameId, json.encodeToString(saved)) }
+                .onFailure { throwable ->
+                    com.playbox.app.diagnostics.AppLogger.warn("Save", "保存国际象棋进度失败", throwable)
+                }
+        }
+    }
+
+    private suspend fun restorePersistentSave() {
+        if (_uiState.value.hasStarted) return
+        val raw = runCatching { saveRepository.load(gameId) }.getOrNull() ?: return
+        val saved = runCatching { json.decodeFromString<SavedChess>(raw) }.getOrNull() ?: return
+        val savedEngine = ChessEngine.restore(saved.snapshot)
+        if (savedEngine.status.isGameOver) {
+            runCatching { saveRepository.clear(gameId) }
+            return
+        }
+        engine = savedEngine
+        _uiState.value = ChessUiState(
+            board = engine.boardList(),
+            mode = saved.mode,
+            humanColor = saved.humanColor,
+            sideToMove = engine.sideToMove,
+            lastMove = engine.lastMove,
+            outcome = engine.status.outcome,
+            winner = engine.status.winner,
+            inCheck = engine.status.inCheck,
+            hasStarted = true,
+        )
+        if (saved.mode == ChessMode.AI && engine.sideToMove != saved.humanColor) {
+            triggerAi()
+        }
+    }
+
+    private fun clearPersistentSave() {
+        viewModelScope.launch { runCatching { saveRepository.clear(gameId) } }
     }
 
     private fun selectSquare(square: ChessSquare) {
@@ -237,10 +301,12 @@ class ChessViewModel(
         _uiState.update { it.copy(score = score, isAiThinking = false) }
         if (state.mode == ChessMode.AI) {
             viewModelScope.launch {
+                clearPersistentSave()
                 val isNewRecord = if (score > 0) persistFinishedGame(score) else false
                 _uiState.update { it.copy(showResult = true, isNewRecord = isNewRecord) }
             }
         } else {
+            clearPersistentSave()
             _uiState.update { it.copy(showResult = true) }
         }
     }
@@ -249,11 +315,15 @@ class ChessViewModel(
         List(64) { index -> pieceAt(index / 8, index % 8) }
 
     companion object {
-        fun factory(statsRepository: GameStatsRepository): ViewModelProvider.Factory =
+        fun factory(
+            statsRepository: GameStatsRepository,
+            saveRepository: GameSaveRepository,
+        ): ViewModelProvider.Factory =
             viewModelFactory {
                 initializer {
                     ChessViewModel(
                         statsRepository = statsRepository,
+                        saveRepository = saveRepository,
                         savedStateHandle = createSavedStateHandle(),
                     )
                 }

@@ -1,8 +1,10 @@
 package com.playbox.app
 
 import android.content.Context
+import com.playbox.app.data.repository.PreferencesGameSaveRepository
 import com.playbox.app.data.repository.PreferencesGameStatsRepository
 import com.playbox.app.data.repository.PreferencesSettingsRepository
+import com.playbox.app.domain.repository.GameSaveRepository
 import com.playbox.app.domain.repository.GameStatsRepository
 import com.playbox.app.domain.repository.SettingsRepository
 
@@ -15,4 +17,6 @@ class AppContainer(context: Context) {
     val gameStatsRepository: GameStatsRepository = PreferencesGameStatsRepository(applicationContext)
 
     val settingsRepository: SettingsRepository = PreferencesSettingsRepository(applicationContext)
+
+    val gameSaveRepository: GameSaveRepository = PreferencesGameSaveRepository(applicationContext)
 }

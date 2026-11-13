@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.playbox.app.domain.model.Achievement
 import com.playbox.app.domain.model.GameCatalog
+import com.playbox.app.domain.model.GameCategory
 import com.playbox.app.domain.model.GameId
 import com.playbox.app.diagnostics.AppLogger
 import com.playbox.app.domain.repository.GameStatsRepository
@@ -43,31 +44,65 @@ class HomeViewModel(
         key = FILTER_KEY,
         initialValue = HomeFilter.ALL.name,
     )
+    private val queryFlow = savedStateHandle.getStateFlow(
+        key = QUERY_KEY,
+        initialValue = "",
+    )
 
     val uiState: StateFlow<HomeUiState> = combine(
         statsRepository.stats,
         filterFlow,
-    ) { stats, storedFilter ->
+        queryFlow,
+    ) { stats, storedFilter, query ->
         val filter = HomeFilter.entries.firstOrNull { it.name == storedFilter }
             ?: HomeFilter.ALL
+        val normalizedQuery = query.trim()
 
         val visibleGames = when (filter) {
             HomeFilter.ALL -> GameCatalog.all
             HomeFilter.FAVORITES -> GameCatalog.all.filter { it.id in stats.favorites }
             HomeFilter.RECENT -> stats.recentGameIds.mapNotNull(GameCatalog::findById)
+        }.filter { game ->
+            normalizedQuery.isEmpty() ||
+                game.name.contains(normalizedQuery, ignoreCase = true) ||
+                game.tagline.contains(normalizedQuery, ignoreCase = true) ||
+                game.category.label.contains(normalizedQuery, ignoreCase = true)
+        }
+
+        val items = visibleGames.map { game ->
+            HomeGameItem(
+                game = game,
+                highScore = stats.highScoreFor(game.id),
+                isFavorite = game.id in stats.favorites,
+                playCount = stats.playCountFor(game.id),
+            )
+        }
+        val orderedCategories = listOf(
+            GameCategory.STRATEGY,
+            GameCategory.PUZZLE,
+            GameCategory.ARCADE,
+            GameCategory.CASUAL,
+        )
+        val sections = orderedCategories.mapNotNull { category ->
+            val categoryItems = items.filter { it.game.category == category }
+            if (categoryItems.isEmpty()) null else HomeSection(
+                category = category,
+                title = when (category) {
+                    GameCategory.STRATEGY -> "棋牌策略"
+                    GameCategory.PUZZLE -> "益智解谜"
+                    GameCategory.ARCADE -> "街机反应"
+                    GameCategory.CASUAL -> "休闲"
+                },
+                games = categoryItems,
+            )
         }
 
         HomeUiState(
             isLoading = false,
             filter = filter,
-            games = visibleGames.map { game ->
-                HomeGameItem(
-                    game = game,
-                    highScore = stats.highScoreFor(game.id),
-                    isFavorite = game.id in stats.favorites,
-                    playCount = stats.playCountFor(game.id),
-                )
-            },
+            query = query,
+            sections = sections,
+            games = items,
             totalPlays = stats.totalPlays,
             achievements = Achievement.entries.map { it.progressFor(stats) },
         )
@@ -79,6 +114,10 @@ class HomeViewModel(
 
     fun selectFilter(filter: HomeFilter) {
         savedStateHandle[FILTER_KEY] = filter.name
+    }
+
+    fun updateQuery(query: String) {
+        savedStateHandle[QUERY_KEY] = query
     }
 
     fun toggleFavorite(gameId: GameId) {
@@ -102,6 +141,7 @@ class HomeViewModel(
 
     companion object {
         private const val FILTER_KEY = "home_filter"
+        private const val QUERY_KEY = "home_query"
 
         fun factory(statsRepository: GameStatsRepository): ViewModelProvider.Factory =
             viewModelFactory {
