@@ -152,6 +152,18 @@ object GameCatalog {
             category = GameCategory.STRATEGY,
         ),
         GameInfo(
+            id = GameId.XIANGQI,
+            name = "中国象棋",
+            tagline = "楚河汉界，将死对方",
+            rules = listOf(
+                "标准 9×10 中国象棋，红方先手，目标是将死或困毙对方的将帅。",
+                "包含马腿、象眼、九宫、过河兵、炮架、飞将等完整走子规则。",
+                "支持人机对战与双人同屏；人机模式可选择执红先手或执黑后手。",
+                "人机模式悔棋会同时撤回 AI 的上一手；双人同屏只撤回一手。",
+            ),
+            category = GameCategory.STRATEGY,
+        ),
+        GameInfo(
             id = GameId.EATCAT,
             name = "吃掉小猫猫",
             tagline = "本地网页音游",

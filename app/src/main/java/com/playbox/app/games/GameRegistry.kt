@@ -21,6 +21,7 @@ object GameRegistry {
         GameId.BALL_BATTLE,
         GameId.GOMOKU,
         GameId.CHESS,
+        GameId.XIANGQI,
         GameId.EATCAT,
     )
 

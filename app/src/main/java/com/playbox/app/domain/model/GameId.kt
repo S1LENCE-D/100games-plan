@@ -19,6 +19,7 @@ enum class GameId(val slug: String) {
     BALL_BATTLE("ball_battle"),
     GOMOKU("gomoku"),
     CHESS("chess"),
+    XIANGQI("xiangqi"),
     EATCAT("eatcat"),
     ;
 

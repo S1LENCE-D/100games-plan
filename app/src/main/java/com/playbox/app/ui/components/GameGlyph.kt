@@ -255,6 +255,18 @@ private fun DrawScope.drawUnifiedGlyph(
             line(10.3f, 5f, 12.7f, 5f)
         }
 
+        GameId.XIANGQI -> {
+            line(4f, 5f, 20f, 5f)
+            line(4f, 12f, 20f, 12f)
+            line(4f, 19f, 20f, 19f)
+            line(4f, 5f, 4f, 19f)
+            line(12f, 5f, 12f, 19f)
+            line(20f, 5f, 20f, 19f)
+            drawCircle(color = accent, radius = 4.2f * unit, center = p(8f, 8.5f))
+            drawCircle(color = ink, radius = 2.2f * unit, center = p(8f, 8.5f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.2f * unit))
+            drawCircle(color = secondaryAccent, radius = 4.2f * unit, center = p(16f, 15.5f))
+        }
+
         GameId.EATCAT -> {
             val leftEar = Path().apply {
                 moveTo(5.5f * unit, 9f * unit)
