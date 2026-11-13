@@ -44,6 +44,7 @@ class Game2048ViewModel(
     private var engine = Game2048Engine.newGame()
     private var pendingDirection: MoveDirection? = null
     private var gameOverHandled = false
+    private var pendingSave: SavedGame2048? = null
 
     private val _uiState = MutableStateFlow(
         Game2048UiState(
@@ -58,7 +59,7 @@ class Game2048ViewModel(
         restoreSession()
         if (!_uiState.value.hasStarted) {
             viewModelScope.launch {
-                restorePersistentSave()
+                loadPendingSave()
             }
         }
     }
@@ -217,7 +218,30 @@ class Game2048ViewModel(
         }
     }
 
-    private suspend fun restorePersistentSave() {
+    fun resumeSavedGame() {
+        val saved = pendingSave ?: return
+        pendingSave = null
+        _uiState.update { it.copy(showSaveChoice = false) }
+        restoreSaved(saved, paused = true)
+    }
+
+    fun startNewGameFromSave() {
+        pendingSave = null
+        _uiState.update { it.copy(showSaveChoice = false) }
+        clearPersistentSave()
+    }
+
+    fun saveAndExit(onSaved: () -> Unit) {
+        viewModelScope.launch {
+            val raw = currentSessionJson()
+            if (raw != null) {
+                runCatching { saveRepository.save(gameId, raw) }
+            }
+            onSaved()
+        }
+    }
+
+    private suspend fun loadPendingSave() {
         if (_uiState.value.hasStarted) return
         val raw = runCatching { saveRepository.load(gameId) }.getOrNull() ?: return
         val saved = runCatching { json.decodeFromString<SavedGame2048>(raw) }.getOrNull() ?: return
@@ -225,7 +249,8 @@ class Game2048ViewModel(
             runCatching { saveRepository.clear(gameId) }
             return
         }
-        restoreSaved(saved, paused = true)
+        pendingSave = saved
+        _uiState.update { it.copy(showSaveChoice = true) }
     }
 
     private fun restoreSaved(saved: SavedGame2048, paused: Boolean) {

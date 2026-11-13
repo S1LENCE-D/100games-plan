@@ -53,6 +53,7 @@ import com.playbox.app.ui.components.game.GameHelpSheet
 import com.playbox.app.ui.components.game.GameContentContainer
 import com.playbox.app.ui.components.game.GamePauseOverlay
 import com.playbox.app.ui.components.game.GameReadyOverlay
+import com.playbox.app.ui.components.game.GameSaveChoiceDialog
 import com.playbox.app.ui.components.game.GameResultDialog
 import com.playbox.app.ui.components.game.GameScaffold
 import com.playbox.app.ui.components.game.GameStatusItem
@@ -164,7 +165,7 @@ fun Game2048RouteScreen(
             }
         }
 
-        if (!uiState.hasStarted) {
+        if (!uiState.hasStarted && !uiState.showSaveChoice) {
             GameReadyOverlay(
                 showTutorial = tutorialSeen == false,
                 title = "2048",
@@ -197,8 +198,20 @@ fun Game2048RouteScreen(
 
     if (showExitConfirmation) {
         ExitGameConfirmDialog(
-            onConfirm = onExit,
+            autoSave = true,
+            onConfirm = {
+                showExitConfirmation = false
+                viewModel.saveAndExit(onExit)
+            },
             onDismiss = { showExitConfirmation = false },
+        )
+    }
+    if (uiState.showSaveChoice) {
+        GameSaveChoiceDialog(
+            gameName = "2048",
+            onResume = viewModel::resumeSavedGame,
+            onNewGame = viewModel::startNewGameFromSave,
+            onExit = onExit,
         )
     }
 

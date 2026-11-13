@@ -40,15 +40,14 @@ class SudokuViewModel(
     private var engine = SudokuEngine.newGame(difficulty)
     private var elapsedSeconds = 0
     private var finishHandled = false
+    private var pendingSave: SavedSudoku? = null
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _uiState = MutableStateFlow(previewState())
     val uiState: StateFlow<SudokuUiState> = _uiState.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            restorePersistentSave()
-        }
+        viewModelScope.launch { loadPendingSave() }
     }
 
     fun selectDifficulty(selected: SudokuDifficulty) {
@@ -202,14 +201,9 @@ class SudokuViewModel(
         }
     }
 
-    private suspend fun restorePersistentSave() {
-        if (_uiState.value.hasStarted) return
-        val raw = runCatching { saveRepository.load(gameId) }.getOrNull() ?: return
-        val saved = runCatching { json.decodeFromString<SavedSudoku>(raw) }.getOrNull() ?: return
-        if (saved.snapshot.completed) {
-            runCatching { saveRepository.clear(gameId) }
-            return
-        }
+    fun resumeSavedGame() {
+        val saved = pendingSave ?: return
+        pendingSave = null
         difficulty = saved.snapshot.difficulty
         engine = SudokuEngine.restore(saved.snapshot)
         elapsedSeconds = saved.elapsedSeconds
@@ -221,7 +215,37 @@ class SudokuViewModel(
             elapsedSeconds = elapsedSeconds,
             hasStarted = true,
             isPaused = true,
+            showSaveChoice = false,
         )
+    }
+
+    fun startNewGameFromSave() {
+        pendingSave = null
+        _uiState.update { it.copy(showSaveChoice = false) }
+        clearPersistentSave()
+    }
+
+    fun saveAndExit(onSaved: () -> Unit) {
+        viewModelScope.launch {
+            val state = _uiState.value
+            if (state.hasStarted && !state.isGameOver) {
+                val saved = SavedSudoku(engine.snapshot(), elapsedSeconds, state.notesMode)
+                runCatching { saveRepository.save(gameId, json.encodeToString(saved)) }
+            }
+            onSaved()
+        }
+    }
+
+    private suspend fun loadPendingSave() {
+        if (_uiState.value.hasStarted) return
+        val raw = runCatching { saveRepository.load(gameId) }.getOrNull() ?: return
+        val saved = runCatching { json.decodeFromString<SavedSudoku>(raw) }.getOrNull() ?: return
+        if (saved.snapshot.completed) {
+            runCatching { saveRepository.clear(gameId) }
+            return
+        }
+        pendingSave = saved
+        _uiState.update { it.copy(showSaveChoice = true) }
     }
 
     private fun clearPersistentSave() {

@@ -15,6 +15,7 @@ data class GomokuUiState(
     val isAiThinking: Boolean = false,
     val isDraw: Boolean = false,
     val hasStarted: Boolean = false,
+    val showSaveChoice: Boolean = false,
     val showResult: Boolean = false,
     val isNewRecord: Boolean = false,
     val score: Int = 0,

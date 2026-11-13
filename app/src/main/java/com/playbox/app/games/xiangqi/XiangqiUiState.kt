@@ -22,6 +22,7 @@ data class XiangqiUiState(
     val isAiThinking: Boolean = false,
     val moveCount: Int = 0,
     val hasStarted: Boolean = false,
+    val showSaveChoice: Boolean = false,
     val showResult: Boolean = false,
     val isNewRecord: Boolean = false,
     val score: Int = 0,

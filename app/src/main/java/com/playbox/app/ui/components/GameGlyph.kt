@@ -269,48 +269,75 @@ private fun DrawScope.drawUnifiedGlyph(
         }
 
         GameId.UNO -> {
-            drawCircle(color = Color(0xFFD7263D), radius = 4.2f * unit, center = p(7.2f, 7.2f))
-            drawCircle(color = Color(0xFFF2C14E), radius = 4.2f * unit, center = p(16.8f, 7.2f))
-            drawCircle(color = Color(0xFF2A9D5C), radius = 4.2f * unit, center = p(7.2f, 16.8f))
-            drawCircle(color = Color(0xFF246EB9), radius = 4.2f * unit, center = p(16.8f, 16.8f))
-            drawCircle(color = ink, radius = 2.1f * unit, center = p(12f, 12f))
+            drawRoundRect(
+                color = ink.copy(alpha = 0.12f),
+                topLeft = p(5f, 3.5f),
+                size = Size(14f * unit, 17f * unit),
+                cornerRadius = CornerRadius(3f * unit),
+            )
+            drawRoundRect(
+                color = ink,
+                topLeft = p(5f, 3.5f),
+                size = Size(14f * unit, 17f * unit),
+                cornerRadius = CornerRadius(3f * unit),
+                style = Stroke(width = 1.3f * unit),
+            )
+            drawCircle(color = accent, radius = 2.1f * unit, center = p(9.2f, 8.2f))
+            drawCircle(color = secondaryAccent, radius = 2.1f * unit, center = p(14.8f, 8.2f))
+            drawCircle(color = accent.copy(alpha = 0.55f), radius = 2.1f * unit, center = p(9.2f, 15.8f))
+            drawCircle(color = secondaryAccent.copy(alpha = 0.55f), radius = 2.1f * unit, center = p(14.8f, 15.8f))
         }
 
         GameId.DOUDIZHU -> {
-            drawCircle(color = accent, radius = 4.2f * unit, center = p(7.5f, 9.5f))
-            drawCircle(color = secondaryAccent, radius = 4.2f * unit, center = p(15.8f, 12.5f))
-            line(5f, 18f, 9f, 18f)
-            line(9f, 18f, 7.5f, 16.5f)
-            line(19f, 6f, 15f, 6f)
-            line(15f, 6f, 16.5f, 4.5f)
+            drawRoundRect(
+                color = accent.copy(alpha = 0.55f),
+                topLeft = p(4f, 7f),
+                size = Size(9f * unit, 13f * unit),
+                cornerRadius = CornerRadius(2f * unit),
+            )
+            drawRoundRect(
+                color = secondaryAccent.copy(alpha = 0.8f),
+                topLeft = p(10f, 4f),
+                size = Size(9f * unit, 13f * unit),
+                cornerRadius = CornerRadius(2f * unit),
+            )
+            drawRoundRect(
+                color = ink,
+                topLeft = p(10f, 4f),
+                size = Size(9f * unit, 13f * unit),
+                cornerRadius = CornerRadius(2f * unit),
+                style = Stroke(width = 1.2f * unit),
+            )
+            drawCircle(color = ink, radius = 1.4f * unit, center = p(14.5f, 10.5f))
         }
 
         GameId.LIQUID_SORT -> {
             val glass = Path().apply {
-                moveTo(7f * unit, 3f * unit)
-                lineTo(17f * unit, 3f * unit)
-                lineTo(17f * unit, 19f * unit)
-                lineTo(16f * unit, 21f * unit)
-                lineTo(8f * unit, 21f * unit)
-                lineTo(7f * unit, 19f * unit)
+                moveTo(8f * unit, 3f * unit)
+                lineTo(16f * unit, 3f * unit)
+                lineTo(16f * unit, 18.5f * unit)
+                lineTo(15f * unit, 21f * unit)
+                lineTo(9f * unit, 21f * unit)
+                lineTo(8f * unit, 18.5f * unit)
                 close()
             }
-            drawPath(glass, ink.copy(alpha = 0.16f))
+            drawPath(glass, ink.copy(alpha = 0.10f))
             drawPath(glass, ink, style = Stroke(width = 1.4f * unit))
-            val colors = listOf(
-                Color(0xFFE45B78),
-                Color(0xFFF2C14E),
-                Color(0xFF43B581),
-                Color(0xFF4B8BE5),
+            line(8f, 5.2f, 16f, 5.2f)
+            val layerColors = listOf(
+                accent,
+                secondaryAccent,
+                accent.copy(alpha = 0.45f),
             )
-            colors.forEachIndexed { index, color ->
+            layerColors.forEachIndexed { index, color ->
                 drawRoundRect(
                     color = color,
-                    topLeft = Offset(8f * unit, (18.5f - index * 3.8f) * unit),
-                    size = Size(8f * unit, 3.8f * unit),
-                    cornerRadius = CornerRadius(0.8f * unit),
+                    topLeft = p(9.2f, 17.4f - index * 3.9f),
+                    size = Size(5.6f * unit, 3.8f * unit),
+                    cornerRadius = CornerRadius(0.7f * unit),
                 )
             }
+            line(10f, 7.2f, 10f, 16.2f)
         }
 
         GameId.EATCAT -> {

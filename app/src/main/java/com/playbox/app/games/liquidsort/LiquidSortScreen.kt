@@ -34,6 +34,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -49,6 +50,7 @@ import com.playbox.app.ui.components.game.GameButtonContent
 import com.playbox.app.ui.components.game.GameContentContainer
 import com.playbox.app.ui.components.game.GameHelpSheet
 import com.playbox.app.ui.components.game.GameReadyOverlay
+import com.playbox.app.ui.components.game.GameSaveChoiceDialog
 import com.playbox.app.ui.components.game.GameResultDialog
 import com.playbox.app.ui.components.game.GameScaffold
 import com.playbox.app.ui.components.game.GameStatusItem
@@ -120,6 +122,15 @@ fun LiquidSortRouteScreen(
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center,
                 )
+                if (state.message.isNotBlank()) {
+                    Text(
+                        text = state.message,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                    )
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 BoxWithConstraints(
                     modifier = Modifier
@@ -142,6 +153,7 @@ fun LiquidSortRouteScreen(
                                     TubeView(
                                         liquid = tube,
                                         selected = state.selectedTube == tubeIndex,
+                                        validTarget = tubeIndex in state.validTargets,
                                         onClick = { viewModel.selectTube(tubeIndex) },
                                     )
                                 }
@@ -181,7 +193,7 @@ fun LiquidSortRouteScreen(
             }
         }
 
-        if (!state.hasStarted) {
+        if (!state.hasStarted && !state.showSaveChoice) {
             GameReadyOverlay(
                 showTutorial = tutorialSeen == false,
                 title = "彩液分瓶",
@@ -199,7 +211,22 @@ fun LiquidSortRouteScreen(
         GameHelpSheet("彩液分瓶", LiquidHelp, onDismiss = { showHelp = false })
     }
     if (showExitConfirmation) {
-        ExitGameConfirmDialog(onConfirm = onExit, onDismiss = { showExitConfirmation = false })
+        ExitGameConfirmDialog(
+            autoSave = true,
+            onConfirm = {
+                showExitConfirmation = false
+                viewModel.saveAndExit(onExit)
+            },
+            onDismiss = { showExitConfirmation = false },
+        )
+    }
+    if (state.showSaveChoice) {
+        GameSaveChoiceDialog(
+            gameName = "彩液分瓶",
+            onResume = viewModel::resumeSavedGame,
+            onNewGame = viewModel::startNewGameFromSave,
+            onExit = onExit,
+        )
     }
     if (state.showResult) {
         GameResultDialog(
@@ -222,10 +249,17 @@ fun LiquidSortRouteScreen(
 private fun TubeView(
     liquid: List<Int>,
     selected: Boolean,
+    validTarget: Boolean,
     onClick: () -> Unit,
 ) {
-    val outline = if (selected) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    val outline = when {
+        selected -> MaterialTheme.colorScheme.tertiary
+        validTarget -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.9f)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    }
     val glassTint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.35f)
+    val targetGlow = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.22f)
+    val shadow = Color.Black.copy(alpha = 0.32f)
     Canvas(
         modifier = Modifier
             .width(56.dp)
@@ -238,6 +272,20 @@ private fun TubeView(
         val right = size.width - 5f
         val bottom = size.height - 4f
         val inner = Rect(left + 4f, top + 6f, right - 4f, bottom - 4f)
+        if (validTarget || selected) {
+            drawRoundRect(
+                color = targetGlow,
+                topLeft = Offset(left - 4f, top - 4f),
+                size = Size(right - left + 8f, bottom - top + 6f),
+                cornerRadius = CornerRadius(18f, 18f),
+            )
+        }
+        drawRoundRect(
+            color = shadow,
+            topLeft = Offset(left + 3f, top + 5f),
+            size = Size(right - left, bottom - top),
+            cornerRadius = CornerRadius(16f, 16f),
+        )
         val glass = Path().apply {
             addRoundRect(
                 RoundRect(
@@ -249,7 +297,16 @@ private fun TubeView(
                 ),
             )
         }
-        drawPath(glass, glassTint)
+        drawPath(
+            glass,
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.16f),
+                    glassTint,
+                    Color.White.copy(alpha = 0.04f),
+                ),
+            ),
+        )
         val liquidClip = Path().apply {
             addRoundRect(
                 RoundRect(
@@ -264,16 +321,34 @@ private fun TubeView(
         val layerHeight = inner.height / LIQUID_TUBE_CAPACITY
         clipPath(liquidClip) {
             liquid.forEachIndexed { index, colorIndex ->
+                val base = LiquidPalette[colorIndex % LiquidPalette.size]
                 val layerTop = inner.bottom - (index + 1) * layerHeight
                 drawRect(
-                    color = LiquidPalette[colorIndex % LiquidPalette.size],
+                    brush = Brush.verticalGradient(
+                        colors = listOf(base.copy(alpha = 0.82f), base),
+                        startY = layerTop,
+                        endY = layerTop + layerHeight,
+                    ),
                     topLeft = Offset(inner.left, layerTop),
                     size = Size(inner.width, layerHeight + 1f),
                 )
-                drawRect(
-                    color = Color.White.copy(alpha = 0.08f),
-                    topLeft = Offset(inner.left, layerTop),
-                    size = Size(inner.width, 1.5f),
+                if (index == liquid.lastIndex) {
+                    drawOval(
+                        color = Color.White.copy(alpha = 0.22f),
+                        topLeft = Offset(inner.left, layerTop - 1f),
+                        size = Size(inner.width, layerHeight * 0.16f),
+                    )
+                }
+                // 微小气泡，增加玻璃与液体的层次
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.18f),
+                    radius = 1.6f,
+                    center = Offset(inner.left + inner.width * 0.3f, layerTop + layerHeight * 0.55f),
+                )
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.12f),
+                    radius = 1f,
+                    center = Offset(inner.left + inner.width * 0.68f, layerTop + layerHeight * 0.3f),
                 )
             }
         }
@@ -282,7 +357,7 @@ private fun TubeView(
             color = outline,
             style = Stroke(width = if (selected) 3f else 2f),
         )
-        // 管口
+        // 管口与内壁
         drawRoundRect(
             color = outline,
             topLeft = Offset(left, top),
@@ -290,12 +365,23 @@ private fun TubeView(
             cornerRadius = CornerRadius(8f, 8f),
             style = Stroke(width = if (selected) 3f else 2f),
         )
+        drawOval(
+            color = Color.White.copy(alpha = 0.12f),
+            topLeft = Offset(left + 5f, top + 2f),
+            size = Size(right - left - 10f, 4f),
+        )
         // 玻璃高光
         drawLine(
-            color = Color.White.copy(alpha = 0.28f),
+            color = Color.White.copy(alpha = 0.3f),
             start = Offset(left + 9f, top + 20f),
             end = Offset(left + 9f, bottom - 30f),
-            strokeWidth = 2f,
+            strokeWidth = 2.4f,
+        )
+        drawLine(
+            color = Color.White.copy(alpha = 0.12f),
+            start = Offset(right - 11f, top + 24f),
+            end = Offset(right - 11f, bottom - 38f),
+            strokeWidth = 1.2f,
         )
     }
 }

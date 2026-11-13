@@ -52,6 +52,7 @@ import com.playbox.app.ui.components.game.GameButtonContent
 import com.playbox.app.ui.components.game.GameContentContainer
 import com.playbox.app.ui.components.game.GameHelpSheet
 import com.playbox.app.ui.components.game.GameReadyOverlay
+import com.playbox.app.ui.components.game.GameSaveChoiceDialog
 import com.playbox.app.ui.components.game.GameResultDialog
 import com.playbox.app.ui.components.game.GameScaffold
 import com.playbox.app.ui.components.game.GameSegmentedOptions
@@ -202,7 +203,7 @@ fun ChessRouteScreen(
             }
         }
 
-        if (!state.hasStarted) {
+        if (!state.hasStarted && !state.showSaveChoice) {
             GameReadyOverlay(
                 showTutorial = tutorialSeen == false,
                 title = "国际象棋",
@@ -241,8 +242,20 @@ fun ChessRouteScreen(
     }
     if (showExitConfirmation) {
         ExitGameConfirmDialog(
-            onConfirm = onExit,
+            autoSave = true,
+            onConfirm = {
+                showExitConfirmation = false
+                viewModel.saveAndExit(onExit)
+            },
             onDismiss = { showExitConfirmation = false },
+        )
+    }
+    if (state.showSaveChoice) {
+        GameSaveChoiceDialog(
+            gameName = "国际象棋",
+            onResume = viewModel::resumeSavedGame,
+            onNewGame = viewModel::startNewGameFromSave,
+            onExit = onExit,
         )
     }
     if (state.pendingPromotion.isNotEmpty()) {

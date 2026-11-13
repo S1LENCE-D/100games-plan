@@ -43,12 +43,13 @@ class XiangqiViewModel(
     private var engine = XiangqiEngine()
     private var aiJob: Job? = null
     private var finishHandled = false
+    private var pendingSave: SavedXiangqi? = null
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _uiState = MutableStateFlow(XiangqiUiState())
 
     init {
-        viewModelScope.launch { restorePersistentSave() }
+        viewModelScope.launch { loadPendingSave() }
     }
     val uiState: StateFlow<XiangqiUiState> = _uiState.asStateFlow()
 
@@ -157,7 +158,30 @@ class XiangqiViewModel(
         }
     }
 
-    private suspend fun restorePersistentSave() {
+    fun resumeSavedGame() {
+        val saved = pendingSave ?: return
+        pendingSave = null
+        applySavedGame(saved)
+    }
+
+    fun startNewGameFromSave() {
+        pendingSave = null
+        _uiState.update { it.copy(showSaveChoice = false) }
+        clearPersistentSave()
+    }
+
+    fun saveAndExit(onSaved: () -> Unit) {
+        viewModelScope.launch {
+            val state = _uiState.value
+            if (state.hasStarted && !state.isGameOver) {
+                val saved = SavedXiangqi(engine.snapshot(), state.mode, state.humanColor)
+                runCatching { saveRepository.save(gameId, json.encodeToString(saved)) }
+            }
+            onSaved()
+        }
+    }
+
+    private suspend fun loadPendingSave() {
         if (_uiState.value.hasStarted) return
         val raw = runCatching { saveRepository.load(gameId) }.getOrNull() ?: return
         val saved = runCatching { json.decodeFromString<SavedXiangqi>(raw) }.getOrNull() ?: return
@@ -166,7 +190,12 @@ class XiangqiViewModel(
             runCatching { saveRepository.clear(gameId) }
             return
         }
-        engine = savedEngine
+        pendingSave = saved
+        _uiState.update { it.copy(showSaveChoice = true) }
+    }
+
+    private fun applySavedGame(saved: SavedXiangqi) {
+        engine = XiangqiEngine.restore(saved.snapshot)
         _uiState.value = XiangqiUiState(
             board = engine.boardList(),
             mode = saved.mode,
@@ -177,6 +206,7 @@ class XiangqiViewModel(
             winner = engine.status.winner,
             inCheck = engine.status.inCheck,
             hasStarted = true,
+            showSaveChoice = false,
         )
         if (saved.mode == XiangqiMode.AI && engine.sideToMove != saved.humanColor) {
             triggerAi()

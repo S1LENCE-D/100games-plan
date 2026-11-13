@@ -519,6 +519,7 @@ fun GameResultDialog(
 fun ExitGameConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    autoSave: Boolean = false,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -529,7 +530,15 @@ fun ExitGameConfirmDialog(
             )
         },
         title = { Text(text = "退出本局？") },
-        text = { Text(text = "当前局尚未完成的进度不会保存。") },
+        text = {
+            Text(
+                text = if (autoSave) {
+                    "退出时会自动保存当前进度，下次进入可恢复。"
+                } else {
+                    "当前局尚未完成的进度不会保存。"
+                },
+            )
+        },
         confirmButton = {
             TextButton(
                 onClick = onConfirm,

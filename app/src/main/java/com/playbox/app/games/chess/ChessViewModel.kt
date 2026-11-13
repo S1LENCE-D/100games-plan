@@ -43,12 +43,13 @@ class ChessViewModel(
     private var engine = ChessEngine()
     private var aiJob: Job? = null
     private var finishHandled = false
+    private var pendingSave: SavedChess? = null
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _uiState = MutableStateFlow(ChessUiState())
 
     init {
-        viewModelScope.launch { restorePersistentSave() }
+        viewModelScope.launch { loadPendingSave() }
     }
     val uiState: StateFlow<ChessUiState> = _uiState.asStateFlow()
 
@@ -179,7 +180,30 @@ class ChessViewModel(
         }
     }
 
-    private suspend fun restorePersistentSave() {
+    fun resumeSavedGame() {
+        val saved = pendingSave ?: return
+        pendingSave = null
+        applySavedGame(saved)
+    }
+
+    fun startNewGameFromSave() {
+        pendingSave = null
+        _uiState.update { it.copy(showSaveChoice = false) }
+        clearPersistentSave()
+    }
+
+    fun saveAndExit(onSaved: () -> Unit) {
+        viewModelScope.launch {
+            val state = _uiState.value
+            if (state.hasStarted && !state.isGameOver) {
+                val saved = SavedChess(engine.snapshot(), state.mode, state.humanColor)
+                runCatching { saveRepository.save(gameId, json.encodeToString(saved)) }
+            }
+            onSaved()
+        }
+    }
+
+    private suspend fun loadPendingSave() {
         if (_uiState.value.hasStarted) return
         val raw = runCatching { saveRepository.load(gameId) }.getOrNull() ?: return
         val saved = runCatching { json.decodeFromString<SavedChess>(raw) }.getOrNull() ?: return
@@ -188,7 +212,12 @@ class ChessViewModel(
             runCatching { saveRepository.clear(gameId) }
             return
         }
-        engine = savedEngine
+        pendingSave = saved
+        _uiState.update { it.copy(showSaveChoice = true) }
+    }
+
+    private fun applySavedGame(saved: SavedChess) {
+        engine = ChessEngine.restore(saved.snapshot)
         _uiState.value = ChessUiState(
             board = engine.boardList(),
             mode = saved.mode,
@@ -199,6 +228,7 @@ class ChessViewModel(
             winner = engine.status.winner,
             inCheck = engine.status.inCheck,
             hasStarted = true,
+            showSaveChoice = false,
         )
         if (saved.mode == ChessMode.AI && engine.sideToMove != saved.humanColor) {
             triggerAi()

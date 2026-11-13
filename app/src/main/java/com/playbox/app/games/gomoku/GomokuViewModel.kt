@@ -41,12 +41,13 @@ class GomokuViewModel(
     private var engine = GomokuEngine()
     private var aiJob: Job? = null
     private var finishHandled = false
+    private var pendingSave: SavedGomoku? = null
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _uiState = MutableStateFlow(GomokuUiState())
 
     init {
-        viewModelScope.launch { restorePersistentSave() }
+        viewModelScope.launch { loadPendingSave() }
     }
     val uiState: StateFlow<GomokuUiState> = _uiState.asStateFlow()
 
@@ -139,7 +140,30 @@ class GomokuViewModel(
         }
     }
 
-    private suspend fun restorePersistentSave() {
+    fun resumeSavedGame() {
+        val saved = pendingSave ?: return
+        pendingSave = null
+        applySavedGame(saved)
+    }
+
+    fun startNewGameFromSave() {
+        pendingSave = null
+        _uiState.update { it.copy(showSaveChoice = false) }
+        clearPersistentSave()
+    }
+
+    fun saveAndExit(onSaved: () -> Unit) {
+        viewModelScope.launch {
+            val state = _uiState.value
+            if (state.hasStarted && !state.isGameOver) {
+                val saved = SavedGomoku(engine.snapshot(), state.mode, state.humanColor)
+                runCatching { saveRepository.save(gameId, json.encodeToString(saved)) }
+            }
+            onSaved()
+        }
+    }
+
+    private suspend fun loadPendingSave() {
         if (_uiState.value.hasStarted) return
         val raw = runCatching { saveRepository.load(gameId) }.getOrNull() ?: return
         val saved = runCatching { json.decodeFromString<SavedGomoku>(raw) }.getOrNull() ?: return
@@ -147,6 +171,11 @@ class GomokuViewModel(
             runCatching { saveRepository.clear(gameId) }
             return
         }
+        pendingSave = saved
+        _uiState.update { it.copy(showSaveChoice = true) }
+    }
+
+    private fun applySavedGame(saved: SavedGomoku) {
         engine = GomokuEngine.restore(saved.snapshot)
         _uiState.value = GomokuUiState(
             board = engine.board,

@@ -14,6 +14,7 @@ data class SudokuUiState(
     val score: Int = 0,
     val hasStarted: Boolean = false,
     val isPaused: Boolean = false,
+    val showSaveChoice: Boolean = false,
     val isGameOver: Boolean = false,
     val isNewRecord: Boolean = false,
     val showResult: Boolean = false,

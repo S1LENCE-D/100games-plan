@@ -9,6 +9,7 @@ data class Game2048UiState(
     val largestTile: Int = 0,
     val hasStarted: Boolean = false,
     val isPaused: Boolean = false,
+    val showSaveChoice: Boolean = false,
     val isGameOver: Boolean = false,
     val canUndo: Boolean = false,
     val isNewRecord: Boolean = false,

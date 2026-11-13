@@ -36,13 +36,14 @@ class LiquidSortViewModel(
 ) {
     private var engine = LiquidSortEngine.newGame(1)
     private var finishHandled = false
+    private var pendingSave: SavedLiquidSort? = null
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _uiState = MutableStateFlow(previewState())
     val uiState: StateFlow<LiquidSortUiState> = _uiState.asStateFlow()
 
     init {
-        viewModelScope.launch { restorePersistentSave() }
+        viewModelScope.launch { loadPendingSave() }
     }
 
     fun startGame() {
@@ -64,12 +65,20 @@ class LiquidSortViewModel(
         val selected = state.selectedTube
         if (selected == null) {
             if (state.tubes[index].isNotEmpty()) {
-                _uiState.update { it.copy(selectedTube = index) }
+                _uiState.update {
+                    it.copy(
+                        selectedTube = index,
+                        validTargets = state.tubes.indices
+                            .filter { target -> engine.canPour(index, target) }
+                            .toSet(),
+                        message = "选择空管或顶部同色的试管",
+                    )
+                }
             }
             return
         }
         if (selected == index) {
-            _uiState.update { it.copy(selectedTube = null) }
+            _uiState.update { it.copy(selectedTube = null, validTargets = emptySet(), message = "") }
             return
         }
         if (engine.pour(selected, index)) {
@@ -79,16 +88,29 @@ class LiquidSortViewModel(
                 it.copy(
                     tubes = engine.currentTubes,
                     selectedTube = null,
+                    validTargets = emptySet(),
+                    message = "",
                     moves = engine.moves,
                     canUndo = engine.canUndo,
                     isSolved = solved,
                 )
             }
             if (solved) finishGame()
-        } else if (state.tubes[index].isNotEmpty()) {
-            _uiState.update { it.copy(selectedTube = index) }
         } else {
             FeedbackController.error()
+            if (state.tubes[index].isNotEmpty()) {
+                _uiState.update {
+                    it.copy(
+                        selectedTube = index,
+                        validTargets = state.tubes.indices
+                            .filter { target -> engine.canPour(index, target) }
+                            .toSet(),
+                        message = "不能倒入不同颜色；选择空管或顶部同色试管",
+                    )
+                }
+            } else {
+                _uiState.update { it.copy(message = "只能倒入空管或顶部同色试管") }
+            }
         }
     }
 
@@ -99,6 +121,8 @@ class LiquidSortViewModel(
             it.copy(
                 tubes = engine.currentTubes,
                 selectedTube = null,
+                validTargets = emptySet(),
+                message = "",
                 moves = engine.moves,
                 canUndo = engine.canUndo,
                 isSolved = false,
@@ -138,17 +162,14 @@ class LiquidSortViewModel(
         }
     }
 
-    private suspend fun restorePersistentSave() {
-        if (_uiState.value.hasStarted) return
-        val raw = runCatching { saveRepository.load(gameId) }.getOrNull() ?: return
-        val saved = runCatching { json.decodeFromString<SavedLiquidSort>(raw) }.getOrNull() ?: return
-        if (saved.snapshot.tubes.all { it.isEmpty() }) {
-            runCatching { saveRepository.clear(gameId) }
-            return
-        }
+    fun resumeSavedGame() {
+        val saved = pendingSave ?: return
+        pendingSave = null
         engine = LiquidSortEngine.restore(saved.snapshot)
         if (engine.isSolved()) {
-            runCatching { saveRepository.clear(gameId) }
+            pendingSave = null
+            _uiState.update { it.copy(showSaveChoice = false) }
+            startGame()
             return
         }
         _uiState.value = previewState().copy(
@@ -158,7 +179,43 @@ class LiquidSortViewModel(
             moves = engine.moves,
             canUndo = false,
             hasStarted = true,
+            showSaveChoice = false,
+            message = "选择空管或顶部同色的试管",
         )
+    }
+
+    fun startNewGameFromSave() {
+        pendingSave = null
+        _uiState.update { it.copy(showSaveChoice = false) }
+        clearPersistentSave()
+    }
+
+    fun saveAndExit(onSaved: () -> Unit) {
+        viewModelScope.launch {
+            val state = _uiState.value
+            if (state.hasStarted && !state.isSolved) {
+                val saved = SavedLiquidSort(engine.snapshot())
+                runCatching { saveRepository.save(gameId, json.encodeToString(saved)) }
+            }
+            onSaved()
+        }
+    }
+
+    private suspend fun loadPendingSave() {
+        if (_uiState.value.hasStarted) return
+        val raw = runCatching { saveRepository.load(gameId) }.getOrNull() ?: return
+        val saved = runCatching { json.decodeFromString<SavedLiquidSort>(raw) }.getOrNull() ?: return
+        if (saved.snapshot.tubes.all { it.isEmpty() }) {
+            runCatching { saveRepository.clear(gameId) }
+            return
+        }
+        val restored = LiquidSortEngine.restore(saved.snapshot)
+        if (restored.isSolved()) {
+            runCatching { saveRepository.clear(gameId) }
+            return
+        }
+        pendingSave = saved
+        _uiState.update { it.copy(showSaveChoice = true) }
     }
 
     private fun previewState(): LiquidSortUiState = LiquidSortUiState(
