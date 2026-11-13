@@ -372,7 +372,7 @@ class ChessEngine private constructor(initialized: Boolean) {
         status = ChessStatus(outcome, winner, check)
     }
 
-    private fun pseudoMoves(color: ChessColor): List<ChessMove> {
+    private fun pseudoMoves(color: ChessColor, includeCastling: Boolean = true): List<ChessMove> {
         val result = mutableListOf<ChessMove>()
         for (row in 0..7) {
             for (column in 0..7) {
@@ -384,7 +384,7 @@ class ChessEngine private constructor(initialized: Boolean) {
                     ChessPieceType.BISHOP -> addSlidingMoves(result, row, column, piece, BISHOP_DIRECTIONS)
                     ChessPieceType.ROOK -> addSlidingMoves(result, row, column, piece, ROOK_DIRECTIONS)
                     ChessPieceType.QUEEN -> addSlidingMoves(result, row, column, piece, QUEEN_DIRECTIONS)
-                    ChessPieceType.KING -> addKingMoves(result, row, column, piece)
+                    ChessPieceType.KING -> addKingMoves(result, row, column, piece, includeCastling)
                 }
             }
         }
@@ -495,6 +495,7 @@ class ChessEngine private constructor(initialized: Boolean) {
         row: Int,
         column: Int,
         piece: ChessPiece,
+        includeCastling: Boolean,
     ) {
         KING_OFFSETS.forEach { (dr, dc) ->
             val targetRow = row + dr
@@ -505,6 +506,7 @@ class ChessEngine private constructor(initialized: Boolean) {
                 moves += ChessMove(ChessSquare(row, column), ChessSquare(targetRow, targetColumn))
             }
         }
+        if (!includeCastling) return
         if (piece.color == ChessColor.WHITE && row == 7 && column == 4) {
             if (castling.whiteKingSide && canCastle(row, column, 6, 7)) {
                 moves += ChessMove(ChessSquare(row, column), ChessSquare(row, 6), isCastling = true)
@@ -549,11 +551,12 @@ class ChessEngine private constructor(initialized: Boolean) {
 
     private fun isInCheck(color: ChessColor): Boolean {
         val king = findKing(color) ?: return true
-        return pseudoMoves(color.other()).any { it.to == king }
+        return isSquareAttacked(king.row, king.column, color)
     }
 
     private fun isSquareAttacked(row: Int, column: Int, color: ChessColor): Boolean {
-        return pseudoMoves(color.other()).any { it.to.row == row && it.to.column == column }
+        return pseudoMoves(color.other(), includeCastling = false)
+            .any { it.to.row == row && it.to.column == column }
     }
 
     private fun findKing(color: ChessColor): ChessSquare? {

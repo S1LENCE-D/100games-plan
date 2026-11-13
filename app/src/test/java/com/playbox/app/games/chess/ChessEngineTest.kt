@@ -46,6 +46,21 @@ class ChessEngineTest {
     }
 
     @Test
+    fun `legal move generation handles castling on both sides`() {
+        val engine = ChessEngine()
+        assertTrue(engine.makeMove(move(6, 4, 4, 4))) // e4
+        assertTrue(engine.makeMove(move(1, 4, 3, 4))) // e5
+        assertTrue(engine.makeMove(move(7, 6, 5, 5))) // Nf3
+        assertTrue(engine.makeMove(move(0, 1, 2, 2))) // Nc6
+        assertTrue(engine.makeMove(move(7, 5, 4, 2))) // Bc4
+        assertTrue(engine.makeMove(move(0, 6, 2, 5))) // Nf6
+        assertTrue(engine.makeMove(move(6, 3, 5, 3))) // d3
+        assertTrue(engine.makeMove(move(0, 5, 1, 4))) // Be7
+        val moves = engine.legalMoves()
+        assertTrue(moves.any { it.isCastling && it.from == ChessSquare(7, 4) && it.to == ChessSquare(7, 6) })
+    }
+
+    @Test
     fun `en passant removes the passed pawn`() {
         val engine = ChessEngine()
         assertTrue(engine.makeMove(move(6, 4, 4, 4))) // e4
