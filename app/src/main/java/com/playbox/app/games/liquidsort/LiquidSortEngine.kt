@@ -93,16 +93,24 @@ class LiquidSortEngine private constructor(
         )
 
         private fun generate(level: Int): LiquidSortEngine {
-            val colorCount = (4 + (level - 1) / 3).coerceIn(4, 10)
-            val random = Random(level * 7919L + 17L)
-            repeat(24) { attempt ->
-                val working = MutableList(colorCount + 2) { mutableListOf<Int>() }
-                repeat(colorCount) { color -> working[color] = MutableList(LIQUID_TUBE_CAPACITY) { color } }
-                var reverseMoves = 0
-                repeat(30 + level * 6) {
+            val colorCount = (4 + level - 1).coerceAtMost(10)
+            val emptyTubes = if (level <= 2) 2 else 1
+            val tubeCount = colorCount + emptyTubes
+            var bestTubes: List<MutableList<Int>>? = null
+            var bestScore = Int.MIN_VALUE
+
+            repeat(18) { attempt ->
+                val random = Random(level * 104_729L + attempt * 7_919L + 31L)
+                val working = MutableList(tubeCount) { mutableListOf<Int>() }
+                repeat(colorCount) { color ->
+                    working[color] = MutableList(LIQUID_TUBE_CAPACITY) { color }
+                }
+                var previousKey: String? = null
+                var beforePreviousKey: String? = null
+                repeat(80 + level * 24) {
                     val possible = mutableListOf<Triple<Int, Int, Int>>()
                     working.forEachIndexed { from, source ->
-                        if (source.isEmpty() || source.size >= LIQUID_TUBE_CAPACITY) return@forEachIndexed
+                        if (source.isEmpty()) return@forEachIndexed
                         val color = source.last()
                         var count = 0
                         for (index in source.indices.reversed()) {
@@ -110,12 +118,10 @@ class LiquidSortEngine private constructor(
                             count += 1
                         }
                         working.forEachIndexed { to, target ->
-                            if (to == from) return@forEachIndexed
-                            if (target.size >= LIQUID_TUBE_CAPACITY) return@forEachIndexed
+                            if (to == from || target.size >= LIQUID_TUBE_CAPACITY) return@forEachIndexed
                             if (target.isEmpty() || target.last() != color) {
                                 val maxMove = minOf(count, LIQUID_TUBE_CAPACITY - target.size)
                                 for (amount in 1..maxMove) {
-                                    // 整段移走时，只有清空原管，反向对应才是合法的正向倒液。
                                     if (amount == count && source.size > count) continue
                                     possible += Triple(from, to, amount)
                                 }
@@ -123,34 +129,60 @@ class LiquidSortEngine private constructor(
                         }
                     }
                     if (possible.isEmpty()) return@repeat
+                    val before = working.map { it.toList() }
                     val (from, to, amount) = possible.random(random)
                     val movedColor = working[from].last()
                     repeat(amount) {
                         working[from].removeAt(working[from].lastIndex)
                         working[to].add(movedColor)
                     }
-                    reverseMoves += 1
+                    val key = working.joinToString("|") { tube -> tube.joinToString(",") }
+                    if (key == beforePreviousKey) {
+                        // 撤销刚刚的拆分，避免生成过程原地踏步。
+                        working.clear()
+                        before.forEach { working.add(it.toMutableList()) }
+                        return@repeat
+                    }
+                    beforePreviousKey = previousKey
+                    previousKey = key
                 }
                 val emptyCount = working.count { it.isEmpty() }
-                val mixed = working.any { tube -> tube.isNotEmpty() && tube.distinct().size > 1 }
-                if (mixed && emptyCount >= 1 && working.any { it.isNotEmpty() }) {
-                    return LiquidSortEngine(
-                        level = level,
-                        colorCount = colorCount,
-                        tubes = working.map { it.toMutableList() }.toMutableList(),
-                        moves = 0,
-                    )
+                val fullUniform = working.count { tube ->
+                    tube.size == LIQUID_TUBE_CAPACITY && tube.distinct().size == 1
+                }
+                val mixed = working.count { it.distinct().size > 1 }
+                val changes = working.sumOf { tube ->
+                    tube.zipWithNext().count { (a, b) -> a != b }
+                }
+                val solved = working.all { it.isEmpty() || it.distinct().size == 1 }
+                if (solved) return@repeat
+                val desiredEmptyPenalty = if (emptyCount < emptyTubes) 80 else (emptyCount - emptyTubes) * 12
+                val score = changes * 12 + mixed * 20 - fullUniform * 90 - desiredEmptyPenalty
+                if (mixed >= colorCount - 1 && fullUniform <= 0 && score > bestScore) {
+                    bestScore = score
+                    bestTubes = working.map { it.toMutableList() }
                 }
             }
-            // 极少数情况下退化为可解的手工分层布局。
-            val fallback = MutableList(colorCount + 2) { mutableListOf<Int>() }
+
+            val selected = bestTubes
+            if (selected != null) {
+                return LiquidSortEngine(
+                    level = level,
+                    colorCount = colorCount,
+                    tubes = selected.map { it.toMutableList() }.toMutableList(),
+                    moves = 0,
+                )
+            }
+
+            // 兜底：保证至少四个试管参与分层，且仍可通过反向步骤还原。
+            val fallback = MutableList(tubeCount) { mutableListOf<Int>() }
             repeat(colorCount) { color ->
                 fallback[color] = MutableList(LIQUID_TUBE_CAPACITY) { color }
             }
-            val a = fallback[0].removeAt(3)
-            val b = fallback[1].removeAt(3)
-            fallback[colorCount].add(a)
-            fallback[colorCount].add(b)
+            val first = fallback[0].removeAt(3)
+            val second = fallback[1].removeAt(3)
+            fallback[colorCount].add(first)
+            fallback[colorCount].add(second)
             return LiquidSortEngine(level, colorCount, fallback, 0)
         }
     }

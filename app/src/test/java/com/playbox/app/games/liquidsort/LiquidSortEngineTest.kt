@@ -16,6 +16,17 @@ class LiquidSortEngineTest {
         assertFalse(engine.isSolved())
         assertTrue(engine.currentTubes.any { it.isEmpty() })
         assertTrue(engine.currentTubes.any { it.distinct().size > 1 })
+        assertTrue(engine.currentTubes.none { it.size == 4 && it.distinct().size == 1 })
+    }
+
+    @Test
+    fun `levels differ and get more complex`() {
+        val level1 = LiquidSortEngine.newGame(1).currentTubes
+        val level2 = LiquidSortEngine.newGame(2).currentTubes
+        val level3 = LiquidSortEngine.newGame(3).currentTubes
+        assertNotEquals(level1, level2)
+        assertTrue(level2.flatten().distinct().size > level1.flatten().distinct().size)
+        assertTrue(level3.flatten().distinct().size > level2.flatten().distinct().size)
     }
 
     @Test
