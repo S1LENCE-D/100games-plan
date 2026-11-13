@@ -164,6 +164,18 @@ object GameCatalog {
             category = GameCategory.STRATEGY,
         ),
         GameInfo(
+            id = GameId.UNO,
+            name = "UNO",
+            tagline = "四人出牌，先出完手牌",
+            rules = listOf(
+                "标准 108 张牌，你与 3 个电脑对战，每人起手 7 张，先出完手牌者获胜。",
+                "可出同色牌，或数字/功能相同的牌；万能牌可改变当前颜色。",
+                "跳过、反转、+2 和万能 +4 会改变出牌顺序或让对手抽牌。",
+                "剩 1 张时先点 UNO 宣告；忘记宣告会罚抽 2 张。",
+            ),
+            category = GameCategory.CASUAL,
+        ),
+        GameInfo(
             id = GameId.EATCAT,
             name = "吃掉小猫猫",
             tagline = "本地网页音游",

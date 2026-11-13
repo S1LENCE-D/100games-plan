@@ -13,6 +13,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
@@ -265,6 +266,14 @@ private fun DrawScope.drawUnifiedGlyph(
             drawCircle(color = accent, radius = 4.2f * unit, center = p(8f, 8.5f))
             drawCircle(color = ink, radius = 2.2f * unit, center = p(8f, 8.5f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.2f * unit))
             drawCircle(color = secondaryAccent, radius = 4.2f * unit, center = p(16f, 15.5f))
+        }
+
+        GameId.UNO -> {
+            drawCircle(color = Color(0xFFD7263D), radius = 4.2f * unit, center = p(7.2f, 7.2f))
+            drawCircle(color = Color(0xFFF2C14E), radius = 4.2f * unit, center = p(16.8f, 7.2f))
+            drawCircle(color = Color(0xFF2A9D5C), radius = 4.2f * unit, center = p(7.2f, 16.8f))
+            drawCircle(color = Color(0xFF246EB9), radius = 4.2f * unit, center = p(16.8f, 16.8f))
+            drawCircle(color = ink, radius = 2.1f * unit, center = p(12f, 12f))
         }
 
         GameId.EATCAT -> {

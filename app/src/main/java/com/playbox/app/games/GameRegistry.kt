@@ -22,6 +22,7 @@ object GameRegistry {
         GameId.GOMOKU,
         GameId.CHESS,
         GameId.XIANGQI,
+        GameId.UNO,
         GameId.EATCAT,
     )
 
