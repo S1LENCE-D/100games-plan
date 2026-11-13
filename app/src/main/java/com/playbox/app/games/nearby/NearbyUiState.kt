@@ -10,6 +10,11 @@ import com.playbox.app.games.chess.ChessMove
 import com.playbox.app.games.chess.ChessOutcome
 import com.playbox.app.games.chess.ChessPiece
 import com.playbox.app.games.chess.ChessSquare
+import com.playbox.app.games.xiangqi.XiangqiColor
+import com.playbox.app.games.xiangqi.XiangqiMove
+import com.playbox.app.games.xiangqi.XiangqiOutcome
+import com.playbox.app.games.xiangqi.XiangqiPiece
+import com.playbox.app.games.xiangqi.XiangqiPoint
 
 enum class NearbySignalQuality {
     UNKNOWN,
@@ -38,6 +43,7 @@ enum class NearbyStage {
     BALL,
     GOMOKU,
     CHESS,
+    XIANGQI,
 }
 
 @Immutable
@@ -98,6 +104,21 @@ data class NearbyBallUiState(
 )
 
 @Immutable
+data class NearbyXiangqiUiState(
+    val board: List<XiangqiPiece?> = emptyList(),
+    val sideToMove: XiangqiColor = XiangqiColor.RED,
+    val selected: XiangqiPoint? = null,
+    val legalTargets: List<XiangqiPoint> = emptyList(),
+    val lastMove: XiangqiMove? = null,
+    val outcome: XiangqiOutcome = XiangqiOutcome.ONGOING,
+    val winner: XiangqiColor? = null,
+    val inCheck: Boolean = false,
+    val moveCount: Int = 0,
+) {
+    val isGameOver: Boolean get() = outcome != XiangqiOutcome.ONGOING
+}
+
+@Immutable
 data class NearbyChessUiState(
     val board: List<ChessPiece?> = emptyList(),
     val sideToMove: ChessColor = ChessColor.WHITE,
@@ -144,6 +165,7 @@ data class NearbyUiState(
     val ball: NearbyBallUiState = NearbyBallUiState(),
     val gomoku: NearbyGomokuUiState = NearbyGomokuUiState(),
     val chess: NearbyChessUiState = NearbyChessUiState(),
+    val xiangqi: NearbyXiangqiUiState = NearbyXiangqiUiState(),
     val signalRssi: Int? = null,
     val signalQuality: NearbySignalQuality = NearbySignalQuality.UNKNOWN,
 )

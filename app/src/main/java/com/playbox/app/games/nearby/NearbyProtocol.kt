@@ -10,6 +10,12 @@ import com.playbox.app.games.chess.ChessOutcome
 import com.playbox.app.games.chess.ChessPiece
 import com.playbox.app.games.chess.ChessPieceType
 import com.playbox.app.games.chess.ChessSquare
+import com.playbox.app.games.xiangqi.XiangqiColor
+import com.playbox.app.games.xiangqi.XiangqiEngine
+import com.playbox.app.games.xiangqi.XiangqiMove
+import com.playbox.app.games.xiangqi.XiangqiOutcome
+import com.playbox.app.games.xiangqi.XiangqiPiece
+import com.playbox.app.games.xiangqi.XiangqiPoint
 import java.util.UUID
 import kotlin.random.Random
 
@@ -28,6 +34,7 @@ object NearbyProtocol {
     const val GAME_BALL = "ball"
     const val GAME_GOMOKU = "gomoku"
     const val GAME_CHESS = "chess"
+    const val GAME_XIANGQI = "xiangqi"
 
     fun encodeRoomName(name: String): ByteArray {
         val trimmed = name.trim().ifBlank { DEFAULT_ROOM_NAME }
@@ -52,6 +59,7 @@ enum class NearbyGame(val wire: String) {
     BALL(NearbyProtocol.GAME_BALL),
     GOMOKU(NearbyProtocol.GAME_GOMOKU),
     CHESS(NearbyProtocol.GAME_CHESS),
+    XIANGQI(NearbyProtocol.GAME_XIANGQI),
     ;
 
     companion object {
@@ -313,4 +321,52 @@ class ChessMatch(
         selected = null
         legalTargets = emptyList()
     }
+}
+
+/** 联机中国象棋：房主执红先手，客人执黑。 */
+class XiangqiMatch(val localColor: XiangqiColor) {
+    private var engine = XiangqiEngine()
+    var selected: XiangqiPoint? = null
+        private set
+    var legalTargets: List<XiangqiPoint> = emptyList()
+        private set
+    val board: List<XiangqiPiece?> get() = (0..89).map { engine.pieceAt(it / 9, it % 9) }
+    val sideToMove: XiangqiColor get() = engine.sideToMove
+    val lastMove: XiangqiMove? get() = engine.lastMove
+    val outcome: XiangqiOutcome get() = engine.status.outcome
+    val winner: XiangqiColor? get() = engine.status.winner
+    val inCheck: Boolean get() = engine.status.inCheck
+    val moveCount: Int get() = engine.moveCount
+    val isGameOver: Boolean get() = engine.status.isGameOver
+    val isLocalTurn: Boolean get() = !isGameOver && sideToMove == localColor
+
+    fun tap(point: XiangqiPoint): XiangqiMove? {
+        if (!isLocalTurn) return null
+        val current = selected
+        if (current == null) {
+            val piece = engine.pieceAt(point.row, point.column) ?: return null
+            if (piece.color != localColor) return null
+            selected = point
+            legalTargets = engine.legalMovesFrom(point).map { it.to }.distinct()
+            return null
+        }
+        if (current == point) { clear(); return null }
+        val candidates = engine.legalMovesFrom(current).filter { it.to == point }
+        if (candidates.isEmpty()) {
+            val piece = engine.pieceAt(point.row, point.column)
+            if (piece != null && piece.color == localColor) {
+                selected = point
+                legalTargets = engine.legalMovesFrom(point).map { it.to }.distinct()
+            }
+            return null
+        }
+        clear()
+        val move = candidates.first()
+        return if (engine.makeMove(move)) move else null
+    }
+
+    fun legalMovesFrom(point: XiangqiPoint): List<XiangqiMove> = engine.legalMovesFrom(point)
+    fun applyRemote(move: XiangqiMove): Boolean = if (isGameOver) false else engine.makeMove(move)
+    fun reset() { engine = XiangqiEngine(); clear() }
+    private fun clear() { selected = null; legalTargets = emptyList() }
 }

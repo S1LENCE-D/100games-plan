@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.BubbleChart
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -81,6 +82,7 @@ import com.playbox.app.R
 import com.playbox.app.games.ballbattle.BallAttribute
 import com.playbox.app.games.nearby.NearbyGame
 import com.playbox.app.games.chess.ChessSquare
+import com.playbox.app.games.xiangqi.XiangqiPoint
 import com.playbox.app.games.nearby.NearbyPeer
 import com.playbox.app.games.nearby.NearbySignalQuality
 import com.playbox.app.games.nearby.NearbyPlayer
@@ -275,6 +277,8 @@ fun NearbyRouteScreen(
                     onNextGomoku = viewModel::nextGomokuRound,
                     onChessSquare = viewModel::tapChessSquare,
                     onNextChess = viewModel::nextChessRound,
+                    onXiangqiPoint = viewModel::tapXiangqiPoint,
+                    onNextXiangqi = viewModel::nextXiangqiRound,
                     onPullRoulette = viewModel::pullRoulette,
                     onRematchRoulette = viewModel::rematchRoulette,
                     onBombGuess = viewModel::submitBombGuess,
@@ -340,6 +344,8 @@ private fun NearbyContent(
     onNextGomoku: () -> Unit,
     onChessSquare: (ChessSquare) -> Unit,
     onNextChess: () -> Unit,
+    onXiangqiPoint: (XiangqiPoint) -> Unit,
+    onNextXiangqi: () -> Unit,
     onPullRoulette: () -> Unit,
     onRematchRoulette: () -> Unit,
     onBombGuess: (Int) -> Unit,
@@ -409,6 +415,12 @@ private fun NearbyContent(
             state = state,
             onSquare = onChessSquare,
             onNext = onNextChess,
+            onDisconnect = onDisconnect,
+        )
+        NearbyStage.XIANGQI -> NearbyXiangqiContent(
+            state = state,
+            onPoint = onXiangqiPoint,
+            onNext = onNextXiangqi,
             onDisconnect = onDisconnect,
         )
         NearbyStage.ROULETTE -> RouletteContent(
@@ -619,6 +631,14 @@ private fun ConnectedLobby(
             onClick = { onChooseGame(NearbyGame.CHESS) },
             centered = true,
             icon = Icons.Filled.EmojiEvents,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        GameEntryCard(
+            title = "联机中国象棋",
+            description = "房主执红先手，标准 9×10 棋盘。",
+            onClick = { onChooseGame(NearbyGame.XIANGQI) },
+            centered = true,
+            icon = Icons.Filled.Map,
         )
         Spacer(modifier = Modifier.height(12.dp))
         GameEntryCard(

@@ -291,7 +291,7 @@ private fun outcomeText(state: XiangqiUiState): String = when (state.outcome) {
 }
 
 @Composable
-private fun XiangqiBoard(
+internal fun XiangqiBoard(
     state: XiangqiUiState,
     onPointTap: (XiangqiPoint) -> Unit,
     modifier: Modifier = Modifier,

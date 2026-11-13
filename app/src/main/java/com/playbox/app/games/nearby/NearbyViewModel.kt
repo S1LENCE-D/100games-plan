@@ -15,6 +15,9 @@ import com.playbox.app.games.chess.ChessColor
 import com.playbox.app.games.chess.ChessMove
 import com.playbox.app.games.chess.ChessPieceType
 import com.playbox.app.games.chess.ChessSquare
+import com.playbox.app.games.xiangqi.XiangqiColor
+import com.playbox.app.games.xiangqi.XiangqiMove
+import com.playbox.app.games.xiangqi.XiangqiPoint
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -42,6 +45,7 @@ class NearbyViewModel(
     private var tttMatch: TttMatch? = null
     private var gomokuMatch: GomokuMatch? = null
     private var chessMatch: ChessMatch? = null
+    private var xiangqiMatch: XiangqiMatch? = null
     private var ballEngine: BallBattleEngine? = null
     private var ballLoopJob: Job? = null
     private var ballRemoteBuild: BallBuild? = null
@@ -197,6 +201,7 @@ class NearbyViewModel(
             NearbyGame.BALL -> NearbyStage.BALL
             NearbyGame.GOMOKU -> NearbyStage.GOMOKU
             NearbyGame.CHESS -> NearbyStage.CHESS
+            NearbyGame.XIANGQI -> NearbyStage.XIANGQI
         }
         if (state.isHost) lockRoomForGame()
         _uiState.update {
@@ -210,6 +215,7 @@ class NearbyViewModel(
                 ball = NearbyBallUiState(),
                 gomoku = NearbyGomokuUiState(),
                 chess = NearbyChessUiState(),
+                xiangqi = NearbyXiangqiUiState(),
                 error = null,
             )
         }
@@ -221,6 +227,7 @@ class NearbyViewModel(
             NearbyGame.BALL -> Unit
             NearbyGame.GOMOKU -> if (state.isHost) startGomokuMatch(GOMOKU_BLACK)
             NearbyGame.CHESS -> if (state.isHost) startChessMatch(ChessColor.WHITE)
+            NearbyGame.XIANGQI -> if (state.isHost) startXiangqiMatch(XiangqiColor.RED)
             NearbyGame.RPS -> Unit
         }
     }
@@ -728,6 +735,50 @@ class NearbyViewModel(
         }
     }
 
+    fun tapXiangqiPoint(point: XiangqiPoint) {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.XIANGQI) return
+        val match = xiangqiMatch ?: return
+        val move = match.tap(point)
+        syncXiangqi()
+        if (move != null) sendReliable("XM|${move.from.row}|${move.from.column}|${move.to.row}|${move.to.column}")
+    }
+
+    fun nextXiangqiRound() {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.XIANGQI || !state.xiangqi.isGameOver || !state.isHost) return
+        xiangqiMatch?.reset()
+        sendReliable("XN")
+        syncXiangqi()
+    }
+
+    private fun startXiangqiMatch(localColor: XiangqiColor) {
+        xiangqiMatch = XiangqiMatch(localColor)
+        syncXiangqi()
+    }
+
+    private fun syncXiangqi() {
+        val match = xiangqiMatch ?: return
+        _uiState.update {
+            it.copy(
+                stage = NearbyStage.XIANGQI,
+                game = NearbyGame.XIANGQI,
+                xiangqi = NearbyXiangqiUiState(
+                    board = match.board,
+                    sideToMove = match.sideToMove,
+                    selected = match.selected,
+                    legalTargets = match.legalTargets,
+                    lastMove = match.lastMove,
+                    outcome = match.outcome,
+                    winner = match.winner,
+                    inCheck = match.inCheck,
+                    moveCount = match.moveCount,
+                ),
+                error = null,
+            )
+        }
+    }
+
     private fun startRouletteHost() {
         rouletteEngine = RouletteEngine()
         _uiState.update {
@@ -914,6 +965,7 @@ class NearbyViewModel(
                     NearbyGame.BALL -> NearbyStage.BALL
                     NearbyGame.GOMOKU -> NearbyStage.GOMOKU
                     NearbyGame.CHESS -> NearbyStage.CHESS
+                    NearbyGame.XIANGQI -> NearbyStage.XIANGQI
                 }
                 if (_uiState.value.stage == stage && _uiState.value.game == game) return@let
                 if (_uiState.value.isHost) lockRoomForGame()
@@ -928,12 +980,14 @@ class NearbyViewModel(
                         ball = NearbyBallUiState(),
                         gomoku = NearbyGomokuUiState(),
                         chess = NearbyChessUiState(),
+                        xiangqi = NearbyXiangqiUiState(),
                         error = null,
                     )
                 }
                 if (game == NearbyGame.TIC_TAC_TOE) startTttMatch()
                 if (game == NearbyGame.GOMOKU) startGomokuMatch(GOMOKU_WHITE)
                 if (game == NearbyGame.CHESS) startChessMatch(ChessColor.BLACK)
+                if (game == NearbyGame.XIANGQI) startXiangqiMatch(XiangqiColor.BLACK)
                 if (game == NearbyGame.ROULETTE && _uiState.value.isHost) startRouletteHost()
             }
             "S" -> {
@@ -970,6 +1024,22 @@ class NearbyViewModel(
                 if (_uiState.value.stage != NearbyStage.CHESS) return
                 chessMatch?.reset()
                 syncChess()
+            }
+            "XM" -> {
+                if (_uiState.value.stage != NearbyStage.XIANGQI) return
+                val fr = parts.getOrNull(1)?.toIntOrNull() ?: return
+                val fc = parts.getOrNull(2)?.toIntOrNull() ?: return
+                val tr = parts.getOrNull(3)?.toIntOrNull() ?: return
+                val tc = parts.getOrNull(4)?.toIntOrNull() ?: return
+                val match = xiangqiMatch ?: return
+                val move = match.legalMovesFrom(XiangqiPoint(fr, fc)).firstOrNull { it.to == XiangqiPoint(tr, tc) }
+                if (move != null) match.applyRemote(move)
+                syncXiangqi()
+            }
+            "XN" -> {
+                if (_uiState.value.stage != NearbyStage.XIANGQI) return
+                xiangqiMatch?.reset()
+                syncXiangqi()
             }
             "C" -> {
                 val choice = parts.getOrNull(1)?.let(RpsChoice::fromWire) ?: return
@@ -1155,6 +1225,7 @@ class NearbyViewModel(
         tttMatch = null
         gomokuMatch = null
         chessMatch = null
+        xiangqiMatch = null
         stopBallBattle()
         ballRemoteBuild = null
         ballSeed = null
@@ -1167,6 +1238,7 @@ class NearbyViewModel(
                 ttt = TttUiState(),
                 gomoku = NearbyGomokuUiState(),
                 chess = NearbyChessUiState(),
+                xiangqi = NearbyXiangqiUiState(),
                 bomb = BombUiState(),
                 ball = NearbyBallUiState(),
             )
