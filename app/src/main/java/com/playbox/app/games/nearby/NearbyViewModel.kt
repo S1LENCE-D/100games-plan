@@ -184,6 +184,27 @@ class NearbyViewModel(
         _uiState.value = NearbyUiState()
     }
 
+    /**
+     * 退出当前游戏但保留联机连接，双方都回到游戏选择界面。
+     */
+    fun leaveGame() {
+        val state = _uiState.value
+        if (state.stage == NearbyStage.CONNECTED || state.stage == NearbyStage.IDLE) return
+        clearReliableState()
+        sendReliable("B")
+        resetGameState()
+        _uiState.update {
+            it.copy(
+                stage = NearbyStage.CONNECTED,
+                game = null,
+                gomoku = NearbyGomokuUiState(),
+                chess = NearbyChessUiState(),
+                xiangqi = NearbyXiangqiUiState(),
+                error = null,
+            )
+        }
+    }
+
     fun chooseGame(game: NearbyGame) {
         val state = _uiState.value
         if (state.stage != NearbyStage.CONNECTED) return
@@ -1040,6 +1061,21 @@ class NearbyViewModel(
                 if (_uiState.value.stage != NearbyStage.XIANGQI) return
                 xiangqiMatch?.reset()
                 syncXiangqi()
+            }
+            "B" -> {
+                if (_uiState.value.stage != NearbyStage.CONNECTED) {
+                    resetGameState()
+                    _uiState.update {
+                        it.copy(
+                            stage = NearbyStage.CONNECTED,
+                            game = null,
+                            gomoku = NearbyGomokuUiState(),
+                            chess = NearbyChessUiState(),
+                            xiangqi = NearbyXiangqiUiState(),
+                            error = null,
+                        )
+                    }
+                }
             }
             "C" -> {
                 val choice = parts.getOrNull(1)?.let(RpsChoice::fromWire) ?: return

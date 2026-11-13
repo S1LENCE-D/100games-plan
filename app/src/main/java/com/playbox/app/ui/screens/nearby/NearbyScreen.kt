@@ -166,7 +166,7 @@ fun NearbyRouteScreen(
             else -> true
         }
         if (inMultiplayer) {
-            exitToHome = true
+            exitToHome = uiState.stage == NearbyStage.CONNECTED
             showExitConfirm = true
         } else {
             viewModel.cancel()
@@ -301,9 +301,9 @@ fun NearbyRouteScreen(
             text = {
                 Text(
                     if (uiState.stage == NearbyStage.CONNECTED) {
-                        "退出后会断开与附近玩家的连接。"
+                        "退出后会断开与附近玩家的连接，并返回主页。"
                     } else {
-                        "退出后会断开连接，本局进度不会保留。"
+                        "退出当前游戏后会回到游戏选择界面，联机连接会保留。"
                     },
                 )
             },
@@ -311,8 +311,12 @@ fun NearbyRouteScreen(
                 TextButton(
                     onClick = {
                         showExitConfirm = false
-                        viewModel.disconnect()
-                        if (exitToHome) onBack()
+                        if (uiState.stage == NearbyStage.CONNECTED) {
+                            viewModel.disconnect()
+                            if (exitToHome) onBack()
+                        } else {
+                            viewModel.leaveGame()
+                        }
                     },
                 ) {
                     Text("退出")
