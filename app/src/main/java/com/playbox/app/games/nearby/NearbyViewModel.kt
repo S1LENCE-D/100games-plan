@@ -18,6 +18,8 @@ import com.playbox.app.games.chess.ChessSquare
 import com.playbox.app.games.xiangqi.XiangqiColor
 import com.playbox.app.games.xiangqi.XiangqiMove
 import com.playbox.app.games.xiangqi.XiangqiPoint
+import com.playbox.app.games.uno.UnoEngine
+import com.playbox.app.games.uno.UnoColor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -46,6 +48,7 @@ class NearbyViewModel(
     private var gomokuMatch: GomokuMatch? = null
     private var chessMatch: ChessMatch? = null
     private var xiangqiMatch: XiangqiMatch? = null
+    private var unoEngine: UnoEngine? = null
     private var ballEngine: BallBattleEngine? = null
     private var ballLoopJob: Job? = null
     private var ballRemoteBuild: BallBuild? = null
@@ -223,6 +226,7 @@ class NearbyViewModel(
             NearbyGame.GOMOKU -> NearbyStage.GOMOKU
             NearbyGame.CHESS -> NearbyStage.CHESS
             NearbyGame.XIANGQI -> NearbyStage.XIANGQI
+            NearbyGame.UNO -> NearbyStage.UNO
         }
         if (state.isHost) lockRoomForGame()
         _uiState.update {
@@ -237,6 +241,7 @@ class NearbyViewModel(
                 gomoku = NearbyGomokuUiState(),
                 chess = NearbyChessUiState(),
                 xiangqi = NearbyXiangqiUiState(),
+                uno = null,
                 error = null,
             )
         }
@@ -249,6 +254,7 @@ class NearbyViewModel(
             NearbyGame.GOMOKU -> if (state.isHost) startGomokuMatch(GOMOKU_BLACK)
             NearbyGame.CHESS -> if (state.isHost) startChessMatch(ChessColor.WHITE)
             NearbyGame.XIANGQI -> if (state.isHost) startXiangqiMatch(XiangqiColor.RED)
+            NearbyGame.UNO -> if (state.isHost) startUnoHost()
             NearbyGame.RPS -> Unit
         }
     }
@@ -778,6 +784,64 @@ class NearbyViewModel(
         syncXiangqi()
     }
 
+    fun tapUnoCard(index: Int, color: UnoColor? = null) {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.UNO) return
+        if (state.isHost) {
+            val engine = unoEngine ?: return
+            if (state.uno?.currentPlayer != 0) return
+            if (!engine.playCard(index, color)) return
+            sendRaw(UnoWire.encode(stateFromUno(engine)))
+        } else if (state.uno?.currentPlayer == 1) {
+            sendRaw("UP|$index|${color?.ordinal ?: -1}")
+        }
+        syncUnoFromEngine()
+    }
+
+    fun drawUnoCard() {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.UNO) return
+        if (state.isHost) {
+            val engine = unoEngine ?: return
+            if (state.uno?.currentPlayer != 0) return
+            engine.drawForCurrent()
+            engine.endTurnAfterDraw()
+            sendRaw(UnoWire.encode(stateFromUno(engine)))
+            syncUnoFromEngine()
+        } else if (state.uno?.currentPlayer == 1) {
+            sendRaw("UD")
+        }
+    }
+
+    fun nextUnoRound() {
+        val state = _uiState.value
+        if (state.stage != NearbyStage.UNO || !state.isHost) return
+        startUnoHost()
+        sendReliable("UN")
+    }
+
+    private fun startUnoHost() {
+        unoEngine = UnoEngine(playerCount = 2)
+        syncUnoFromEngine()
+        unoEngine?.let { sendRaw(UnoWire.encode(stateFromUno(it))) }
+    }
+
+    private fun syncUnoFromEngine() {
+        val engine = unoEngine ?: return
+        val state = stateFromUno(engine)
+        _uiState.update { it.copy(stage = NearbyStage.UNO, game = NearbyGame.UNO, uno = state, error = null) }
+    }
+
+    private fun stateFromUno(engine: UnoEngine): UnoOnlineState = UnoOnlineState(
+        hands = listOf(engine.handOf(0), engine.handOf(1)),
+        top = engine.discardTop,
+        currentColor = engine.currentColor,
+        currentPlayer = engine.currentPlayer,
+        drawPileSize = engine.snapshot().drawPileSize,
+        winner = engine.winner,
+        playableIndices = engine.playableIndices(),
+    )
+
     private fun syncXiangqi() {
         val match = xiangqiMatch ?: return
         _uiState.update {
@@ -987,6 +1051,7 @@ class NearbyViewModel(
                     NearbyGame.GOMOKU -> NearbyStage.GOMOKU
                     NearbyGame.CHESS -> NearbyStage.CHESS
                     NearbyGame.XIANGQI -> NearbyStage.XIANGQI
+                    NearbyGame.UNO -> NearbyStage.UNO
                 }
                 if (_uiState.value.stage == stage && _uiState.value.game == game) return@let
                 if (_uiState.value.isHost) lockRoomForGame()
@@ -1002,6 +1067,7 @@ class NearbyViewModel(
                         gomoku = NearbyGomokuUiState(),
                         chess = NearbyChessUiState(),
                         xiangqi = NearbyXiangqiUiState(),
+                        uno = null,
                         error = null,
                     )
                 }
@@ -1009,6 +1075,9 @@ class NearbyViewModel(
                 if (game == NearbyGame.GOMOKU) startGomokuMatch(GOMOKU_WHITE)
                 if (game == NearbyGame.CHESS) startChessMatch(ChessColor.BLACK)
                 if (game == NearbyGame.XIANGQI) startXiangqiMatch(XiangqiColor.BLACK)
+                if (game == NearbyGame.UNO) {
+                    _uiState.update { it.copy(uno = null) }
+                }
                 if (game == NearbyGame.ROULETTE && _uiState.value.isHost) startRouletteHost()
             }
             "S" -> {
@@ -1061,6 +1130,36 @@ class NearbyViewModel(
                 if (_uiState.value.stage != NearbyStage.XIANGQI) return
                 xiangqiMatch?.reset()
                 syncXiangqi()
+            }
+            "US" -> {
+                if (_uiState.value.stage != NearbyStage.UNO) return
+                val decoded = UnoWire.decode(message)?.first ?: return
+                _uiState.update { it.copy(uno = decoded) }
+            }
+            "UP" -> {
+                if (!_uiState.value.isHost || _uiState.value.stage != NearbyStage.UNO) return
+                val engine = unoEngine ?: return
+                if (engine.currentPlayer != 1) return
+                val index = parts.getOrNull(1)?.toIntOrNull() ?: return
+                val color = parts.getOrNull(2)?.toIntOrNull()?.takeIf { it >= 0 }?.let { UnoColor.entries.getOrNull(it) }
+                if (engine.playCard(index, color)) {
+                    sendRaw(UnoWire.encode(stateFromUno(engine)))
+                    syncUnoFromEngine()
+                }
+            }
+            "UD" -> {
+                if (!_uiState.value.isHost || _uiState.value.stage != NearbyStage.UNO) return
+                val engine = unoEngine ?: return
+                if (engine.currentPlayer != 1) return
+                engine.drawForCurrent()
+                engine.endTurnAfterDraw()
+                sendRaw(UnoWire.encode(stateFromUno(engine)))
+                syncUnoFromEngine()
+            }
+            "UN" -> {
+                if (!_uiState.value.isHost || _uiState.value.stage != NearbyStage.UNO) return
+                startUnoHost()
+                sendRaw(UnoWire.encode(stateFromUno(unoEngine!!)))
             }
             "B" -> {
                 if (_uiState.value.stage != NearbyStage.CONNECTED) {
@@ -1262,6 +1361,7 @@ class NearbyViewModel(
         gomokuMatch = null
         chessMatch = null
         xiangqiMatch = null
+        unoEngine = null
         stopBallBattle()
         ballRemoteBuild = null
         ballSeed = null
@@ -1275,6 +1375,7 @@ class NearbyViewModel(
                 gomoku = NearbyGomokuUiState(),
                 chess = NearbyChessUiState(),
                 xiangqi = NearbyXiangqiUiState(),
+                uno = null,
                 bomb = BombUiState(),
                 ball = NearbyBallUiState(),
             )

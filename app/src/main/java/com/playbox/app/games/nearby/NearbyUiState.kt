@@ -15,6 +15,8 @@ import com.playbox.app.games.xiangqi.XiangqiMove
 import com.playbox.app.games.xiangqi.XiangqiOutcome
 import com.playbox.app.games.xiangqi.XiangqiPiece
 import com.playbox.app.games.xiangqi.XiangqiPoint
+import com.playbox.app.games.uno.UnoCard
+import com.playbox.app.games.uno.UnoColor
 
 enum class NearbySignalQuality {
     UNKNOWN,
@@ -44,6 +46,7 @@ enum class NearbyStage {
     GOMOKU,
     CHESS,
     XIANGQI,
+    UNO,
 }
 
 @Immutable
@@ -166,6 +169,7 @@ data class NearbyUiState(
     val gomoku: NearbyGomokuUiState = NearbyGomokuUiState(),
     val chess: NearbyChessUiState = NearbyChessUiState(),
     val xiangqi: NearbyXiangqiUiState = NearbyXiangqiUiState(),
+    val uno: UnoOnlineState? = null,
     val signalRssi: Int? = null,
     val signalQuality: NearbySignalQuality = NearbySignalQuality.UNKNOWN,
 )

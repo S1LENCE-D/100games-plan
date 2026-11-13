@@ -279,6 +279,9 @@ fun NearbyRouteScreen(
                     onNextChess = viewModel::nextChessRound,
                     onXiangqiPoint = viewModel::tapXiangqiPoint,
                     onNextXiangqi = viewModel::nextXiangqiRound,
+                    onUnoPlay = viewModel::tapUnoCard,
+                    onUnoDraw = viewModel::drawUnoCard,
+                    onNextUno = viewModel::nextUnoRound,
                     onPullRoulette = viewModel::pullRoulette,
                     onRematchRoulette = viewModel::rematchRoulette,
                     onBombGuess = viewModel::submitBombGuess,
@@ -350,6 +353,9 @@ private fun NearbyContent(
     onNextChess: () -> Unit,
     onXiangqiPoint: (XiangqiPoint) -> Unit,
     onNextXiangqi: () -> Unit,
+    onUnoPlay: (Int, com.playbox.app.games.uno.UnoColor?) -> Unit,
+    onUnoDraw: () -> Unit,
+    onNextUno: () -> Unit,
     onPullRoulette: () -> Unit,
     onRematchRoulette: () -> Unit,
     onBombGuess: (Int) -> Unit,
@@ -425,6 +431,13 @@ private fun NearbyContent(
             state = state,
             onPoint = onXiangqiPoint,
             onNext = onNextXiangqi,
+            onDisconnect = onDisconnect,
+        )
+        NearbyStage.UNO -> NearbyUnoContent(
+            state = state,
+            onPlay = onUnoPlay,
+            onDraw = onUnoDraw,
+            onNext = onNextUno,
             onDisconnect = onDisconnect,
         )
         NearbyStage.ROULETTE -> RouletteContent(
@@ -643,6 +656,14 @@ private fun ConnectedLobby(
             onClick = { onChooseGame(NearbyGame.XIANGQI) },
             centered = true,
             icon = Icons.Filled.Map,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        GameEntryCard(
+            title = "联机 UNO",
+            description = "双人轮流出牌，先出完手牌者获胜。",
+            onClick = { onChooseGame(NearbyGame.UNO) },
+            centered = true,
+            icon = Icons.Filled.SportsEsports,
         )
         Spacer(modifier = Modifier.height(12.dp))
         GameEntryCard(

@@ -16,6 +16,9 @@ import com.playbox.app.games.xiangqi.XiangqiMove
 import com.playbox.app.games.xiangqi.XiangqiOutcome
 import com.playbox.app.games.xiangqi.XiangqiPiece
 import com.playbox.app.games.xiangqi.XiangqiPoint
+import com.playbox.app.games.uno.UnoCard
+import com.playbox.app.games.uno.UnoColor
+import com.playbox.app.games.uno.UnoKind
 import java.util.UUID
 import kotlin.random.Random
 
@@ -35,6 +38,7 @@ object NearbyProtocol {
     const val GAME_GOMOKU = "gomoku"
     const val GAME_CHESS = "chess"
     const val GAME_XIANGQI = "xiangqi"
+    const val GAME_UNO = "uno"
 
     fun encodeRoomName(name: String): ByteArray {
         val trimmed = name.trim().ifBlank { DEFAULT_ROOM_NAME }
@@ -60,6 +64,7 @@ enum class NearbyGame(val wire: String) {
     GOMOKU(NearbyProtocol.GAME_GOMOKU),
     CHESS(NearbyProtocol.GAME_CHESS),
     XIANGQI(NearbyProtocol.GAME_XIANGQI),
+    UNO(NearbyProtocol.GAME_UNO),
     ;
 
     companion object {
@@ -369,4 +374,75 @@ class XiangqiMatch(val localColor: XiangqiColor) {
     fun applyRemote(move: XiangqiMove): Boolean = if (isGameOver) false else engine.makeMove(move)
     fun reset() { engine = XiangqiEngine(); clear() }
     private fun clear() { selected = null; legalTargets = emptyList() }
+}
+
+/** 双人联机 UNO 的紧凑状态，避免超过 BLE 单包载荷。 */
+data class UnoOnlineState(
+    val hands: List<List<UnoCard>> = listOf(emptyList(), emptyList()),
+    val top: UnoCard? = null,
+    val currentColor: UnoColor = UnoColor.WILD,
+    val currentPlayer: Int = 0,
+    val drawPileSize: Int = 0,
+    val winner: Int? = null,
+    val playableIndices: List<Int> = emptyList(),
+)
+
+object UnoWire {
+    fun encode(state: UnoOnlineState): String = buildString {
+        append("US")
+        state.hands.forEach { hand ->
+            append('|')
+            append(hand.joinToString(",") { cardCode(it) })
+        }
+        append('|')
+        append(state.top?.let(::cardCode).orEmpty())
+        append('|').append(state.currentColor.ordinal)
+        append('|').append(state.currentPlayer)
+        append('|').append(state.drawPileSize)
+        append('|').append(state.winner ?: -1)
+        append('|').append(state.playableIndices.joinToString(","))
+    }
+
+    fun decode(message: String): Pair<UnoOnlineState, Int>? {
+        // H|seq|US|... 已经在外层被剥掉；这里接收 US|...
+        val parts = message.split('|')
+        if (parts.size < 8 || parts[0] != "US") return null
+        val handA = decodeHand(parts[1])
+        val handB = decodeHand(parts[2])
+        val top = decodeCard(parts[3])
+        val color = UnoColor.entries.getOrNull(parts[4].toIntOrNull() ?: -1) ?: return null
+        val current = parts[5].toIntOrNull() ?: return null
+        val drawPile = parts[6].toIntOrNull() ?: return null
+        val winner = (parts[7].toIntOrNull() ?: -1).takeIf { it >= 0 }
+        val playable = parts.getOrNull(8)?.split(',')?.mapNotNull { it.toIntOrNull() } ?: emptyList()
+        return UnoOnlineState(
+            hands = listOf(handA, handB),
+            top = top,
+            currentColor = color,
+            currentPlayer = current,
+            drawPileSize = drawPile,
+            winner = winner,
+            playableIndices = playable,
+        ) to (message.length)
+    }
+
+    fun cardCode(card: UnoCard): String =
+        "${card.color.ordinal}${card.kind.ordinal}${card.number?.plus(1) ?: 0}${card.id}"
+
+    private fun decodeHand(value: String): List<UnoCard> =
+        if (value.isBlank()) emptyList() else value.split(',').mapNotNull(::decodeCard)
+
+    fun decodeCard(value: String): UnoCard? {
+        if (value.length < 4) return null
+        val color = UnoColor.entries.getOrNull(value[0] - '0') ?: return null
+        val kind = UnoKind.entries.getOrNull(value[1] - '0') ?: return null
+        val number = value[2] - '0'
+        val id = value.substring(3).toIntOrNull() ?: return null
+        return UnoCard(
+            id = id,
+            color = color,
+            kind = kind,
+            number = number.takeIf { it > 0 }?.minus(1),
+        )
+    }
 }
