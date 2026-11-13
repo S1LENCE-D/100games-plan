@@ -454,7 +454,7 @@ private fun PlayControls(
 }
 
 @Composable
-private fun DdzCardView(
+internal fun DdzCardView(
     card: DdzCard,
     selected: Boolean,
     enabled: Boolean,
@@ -509,7 +509,7 @@ private fun DdzCardView(
 }
 
 @Composable
-private fun CardBack(small: Boolean = false) {
+internal fun CardBack(small: Boolean = false) {
     val width = if (small) 38.dp else 52.dp
     val height = if (small) 54.dp else 74.dp
     Surface(

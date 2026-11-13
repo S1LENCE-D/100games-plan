@@ -43,12 +43,13 @@ internal fun NearbyUnoContent(
         TextButton(onClick = onDisconnect, modifier = Modifier.fillMaxWidth()) { Text("退出游戏") }
         return
     }
-    val me = if (state.isHost) 0 else 1
+    val me = state.myIndex.coerceIn(0, game.hands.lastIndex.coerceAtLeast(0))
     val hand = game.hands.getOrElse(me) { emptyList() }
     var wildIndex by remember { mutableStateOf<Int?>(null) }
     InfoCard(
         title = "联机 UNO",
-        message = "你手牌 ${hand.size} 张 · 对方 ${game.hands.getOrElse(1 - me) { emptyList() }.size} 张",
+        message = "你手牌 ${hand.size} 张 · 其他玩家 " +
+            game.hands.withIndex().filter { it.index != me }.joinToString(" ") { "${it.value.size}" } + " 张",
     )
     Spacer(modifier = Modifier.height(12.dp))
     Row(

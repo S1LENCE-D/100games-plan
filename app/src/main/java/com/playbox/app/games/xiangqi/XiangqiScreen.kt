@@ -295,13 +295,14 @@ internal fun XiangqiBoard(
     state: XiangqiUiState,
     onPointTap: (XiangqiPoint) -> Unit,
     modifier: Modifier = Modifier,
+    flippedOverride: Boolean? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val boardColor = Color(0xFF2B211A)
     val lineColor = Color(0xFFC8A96E).copy(alpha = 0.72f)
-    val flipped = state.mode == XiangqiMode.AI && state.humanColor == XiangqiColor.BLACK
+    val flipped = flippedOverride ?: (state.mode == XiangqiMode.AI && state.humanColor == XiangqiColor.BLACK)
     val redColor = Color(0xFFB73731)
     val blackColor = Color(0xFF17191E)
     val tokenColor = Color(0xFFE8DCC4)

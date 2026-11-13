@@ -337,6 +337,7 @@ internal fun ChessBoard(
     state: ChessUiState,
     onSquareTap: (ChessSquare) -> Unit,
     modifier: Modifier = Modifier,
+    flippedOverride: Boolean? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
     val textMeasurer = rememberTextMeasurer()
@@ -344,7 +345,7 @@ internal fun ChessBoard(
     val lightSquare = Color(0xFFC7B18C)
     val darkSquare = Color(0xFF67503D)
     val coordinateColor = scheme.onSurfaceVariant.copy(alpha = 0.7f)
-    val flipped = state.mode == ChessMode.AI && state.humanColor == ChessColor.BLACK
+    val flipped = flippedOverride ?: (state.mode == ChessMode.AI && state.humanColor == ChessColor.BLACK)
 
     Canvas(
         modifier = modifier.pointerInput(flipped, state.board, state.isAiThinking, state.isGameOver) {

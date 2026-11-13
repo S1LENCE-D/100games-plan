@@ -219,6 +219,8 @@ class NearbyViewModel(
             if (!state.isHost || state.playerCount < 3) return
         } else if (game == NearbyGame.DDZ) {
             if (!state.isHost || state.playerCount != 3) return
+        } else if (game == NearbyGame.UNO) {
+            if (!state.isHost || state.playerCount !in 2..4) return
         } else {
             if (state.playerCount != 2) return
         }
@@ -800,7 +802,7 @@ class NearbyViewModel(
             if (state.uno?.currentPlayer != 0) return
             if (!engine.playCard(index, color)) return
             sendRaw(UnoWire.encode(stateFromUno(engine)))
-        } else if (state.uno?.currentPlayer == 1) {
+        } else if (state.uno?.currentPlayer == state.myIndex) {
             sendRaw("UP|$index|${color?.ordinal ?: -1}")
         }
         syncUnoFromEngine()
@@ -816,7 +818,7 @@ class NearbyViewModel(
             engine.endTurnAfterDraw()
             sendRaw(UnoWire.encode(stateFromUno(engine)))
             syncUnoFromEngine()
-        } else if (state.uno?.currentPlayer == 1) {
+        } else if (state.uno?.currentPlayer == state.myIndex) {
             sendRaw("UD")
         }
     }
@@ -829,7 +831,7 @@ class NearbyViewModel(
     }
 
     private fun startUnoHost() {
-        unoEngine = UnoEngine(playerCount = 2)
+        unoEngine = UnoEngine(playerCount = _uiState.value.playerCount.coerceIn(2, 4))
         syncUnoFromEngine()
         unoEngine?.let { sendRaw(UnoWire.encode(stateFromUno(it))) }
     }
@@ -841,7 +843,7 @@ class NearbyViewModel(
     }
 
     private fun stateFromUno(engine: UnoEngine): UnoOnlineState = UnoOnlineState(
-        hands = listOf(engine.handOf(0), engine.handOf(1)),
+        hands = (0 until _uiState.value.playerCount.coerceIn(2, 4)).map { engine.handOf(it) },
         top = engine.discardTop,
         currentColor = engine.currentColor,
         currentPlayer = engine.currentPlayer,
@@ -1204,7 +1206,8 @@ class NearbyViewModel(
             "UP" -> {
                 if (!_uiState.value.isHost || _uiState.value.stage != NearbyStage.UNO) return
                 val engine = unoEngine ?: return
-                if (engine.currentPlayer != 1) return
+                val playerIndex = hostGuests.keys.indexOf(fromAddress) + 1
+                if (playerIndex !in 1 until _uiState.value.playerCount || engine.currentPlayer != playerIndex) return
                 val index = parts.getOrNull(1)?.toIntOrNull() ?: return
                 val color = parts.getOrNull(2)?.toIntOrNull()?.takeIf { it >= 0 }?.let { UnoColor.entries.getOrNull(it) }
                 if (engine.playCard(index, color)) {
@@ -1215,7 +1218,8 @@ class NearbyViewModel(
             "UD" -> {
                 if (!_uiState.value.isHost || _uiState.value.stage != NearbyStage.UNO) return
                 val engine = unoEngine ?: return
-                if (engine.currentPlayer != 1) return
+                val playerIndex = hostGuests.keys.indexOf(fromAddress) + 1
+                if (playerIndex !in 1 until _uiState.value.playerCount || engine.currentPlayer != playerIndex) return
                 engine.drawForCurrent()
                 engine.endTurnAfterDraw()
                 sendRaw(UnoWire.encode(stateFromUno(engine)))

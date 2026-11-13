@@ -117,6 +117,7 @@ private fun ChessSurface(
             state = state,
             onSquareTap = onSquare,
             modifier = Modifier.fillMaxSize(),
+            flippedOverride = state.humanColor == ChessColor.BLACK,
         )
     }
 }

@@ -73,7 +73,12 @@ internal fun NearbyXiangqiContent(
                     .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerLow),
             ) {
-                XiangqiBoard(boardState, onPoint, Modifier.fillMaxSize())
+                XiangqiBoard(
+                    boardState,
+                    onPoint,
+                    Modifier.fillMaxSize(),
+                    flippedOverride = localColor == XiangqiColor.BLACK,
+                )
             }
             Column(modifier = Modifier.weight(1f)) {
                 XiangqiInfo(localColor)
@@ -95,7 +100,12 @@ internal fun NearbyXiangqiContent(
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        XiangqiBoard(boardState, onPoint, Modifier.fillMaxSize())
+        XiangqiBoard(
+            boardState,
+            onPoint,
+            Modifier.fillMaxSize(),
+            flippedOverride = localColor == XiangqiColor.BLACK,
+        )
     }
     Spacer(modifier = Modifier.height(8.dp))
     XiangqiStatus(game, localColor, localTurn, state.isHost, onNext)

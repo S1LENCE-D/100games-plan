@@ -639,6 +639,14 @@ private fun ConnectedLobby(
     if (state.playerCount >= 3) {
         if (state.isHost) {
             GameEntryCard(
+                title = "联机 UNO",
+                description = "2–4 人轮流出牌，先出完手牌者获胜。",
+                onClick = { onChooseGame(NearbyGame.UNO) },
+                centered = true,
+                icon = Icons.Filled.SportsEsports,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            GameEntryCard(
                 title = "联机斗地主",
                 description = "3 人叫地主、出牌，先出完手牌的一方获胜。",
                 onClick = { onChooseGame(NearbyGame.DDZ) },

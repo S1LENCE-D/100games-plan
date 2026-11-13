@@ -397,11 +397,8 @@ data class UnoOnlineState(
 
 object UnoWire {
     fun encode(state: UnoOnlineState): String = buildString {
-        append("US")
-        state.hands.forEach { hand ->
-            append('|')
-            append(hand.joinToString(",") { cardCode(it) })
-        }
+        append("US|")
+        append(state.hands.joinToString(";") { hand -> hand.joinToString(",") { cardCode(it) } })
         append('|')
         append(state.top?.let(::cardCode).orEmpty())
         append('|').append(state.currentColor.ordinal)
@@ -412,26 +409,26 @@ object UnoWire {
     }
 
     fun decode(message: String): Pair<UnoOnlineState, Int>? {
-        // H|seq|US|... 已经在外层被剥掉；这里接收 US|...
         val parts = message.split('|')
         if (parts.size < 8 || parts[0] != "US") return null
-        val handA = decodeHand(parts[1])
-        val handB = decodeHand(parts[2])
-        val top = decodeCard(parts[3])
-        val color = UnoColor.entries.getOrNull(parts[4].toIntOrNull() ?: -1) ?: return null
-        val current = parts[5].toIntOrNull() ?: return null
-        val drawPile = parts[6].toIntOrNull() ?: return null
-        val winner = (parts[7].toIntOrNull() ?: -1).takeIf { it >= 0 }
-        val playable = parts.getOrNull(8)?.split(',')?.mapNotNull { it.toIntOrNull() } ?: emptyList()
+        val hands = parts[1].split(';').map { hand ->
+            if (hand.isBlank()) emptyList() else hand.split(',').mapNotNull(::decodeCard)
+        }
+        val top = decodeCard(parts[2])
+        val color = UnoColor.entries.getOrNull(parts[3].toIntOrNull() ?: -1) ?: return null
+        val current = parts[4].toIntOrNull() ?: return null
+        val drawPile = parts[5].toIntOrNull() ?: return null
+        val winner = (parts[6].toIntOrNull() ?: -1).takeIf { it >= 0 }
+        val playable = parts.getOrNull(7)?.split(',')?.mapNotNull { it.toIntOrNull() } ?: emptyList()
         return UnoOnlineState(
-            hands = listOf(handA, handB),
+            hands = hands,
             top = top,
             currentColor = color,
             currentPlayer = current,
             drawPileSize = drawPile,
             winner = winner,
             playableIndices = playable,
-        ) to (message.length)
+        ) to message.length
     }
 
     fun cardCode(card: UnoCard): String {

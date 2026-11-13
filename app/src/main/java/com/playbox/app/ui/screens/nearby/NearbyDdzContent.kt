@@ -3,6 +3,9 @@ package com.playbox.app.ui.screens.nearby
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +28,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.playbox.app.games.doudizhu.DdzPhase
+import com.playbox.app.games.doudizhu.DdzCardView
+import com.playbox.app.games.doudizhu.CardBack
 import com.playbox.app.games.nearby.NearbyUiState
 
 @Composable
@@ -54,6 +59,21 @@ internal fun NearbyDdzContent(
             DdzPhase.FINISHED -> "本局结束"
         },
     )
+    if (game.bottomCards.isNotEmpty()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Text("底牌 ", style = MaterialTheme.typography.labelSmall)
+            game.bottomCards.forEach { card ->
+                if (game.bottomRevealed) {
+                    DdzCardView(card = card, selected = false, enabled = false, small = true, onClick = {})
+                } else {
+                    CardBack(small = true)
+                }
+            }
+        }
+    }
     Spacer(modifier = Modifier.height(8.dp))
     Text(
         text = game.hands.withIndex().joinToString("  ") { (i, h) -> "${playerName(i, me)}:${h.size}" },
@@ -93,28 +113,21 @@ internal fun NearbyDdzContent(
             }
         }
     } else if (game.phase == DdzPhase.PLAYING) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            hand.chunked(6).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                    row.forEach { card ->
-                        Text(
-                            text = card.rankLabel() + card.suitLabel(),
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (card.id in selected) MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceContainerHigh,
-                                )
-                                .clickable(enabled = myTurn) {
-                                    selected = if (card.id in selected) selected - card.id else selected + card.id
-                                }
-                                .padding(vertical = 12.dp),
-                            textAlign = TextAlign.Center,
-                            color = Color.White,
-                        )
-                    }
-                }
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(108.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            items(hand, key = { it.id }) { card ->
+                DdzCardView(
+                    card = card,
+                    selected = card.id in selected,
+                    enabled = myTurn,
+                    onClick = {
+                        selected = if (card.id in selected) selected - card.id else selected + card.id
+                    },
+                )
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
