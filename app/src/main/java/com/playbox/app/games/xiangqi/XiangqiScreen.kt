@@ -47,8 +47,8 @@ import com.playbox.app.ui.components.game.GameResultDialog
 import com.playbox.app.ui.components.game.GameScaffold
 import com.playbox.app.ui.components.game.GameSegmentedOptions
 import com.playbox.app.ui.components.game.GameStatusItem
-import kotlin.math.hypot
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 private val XiangqiHelp = listOf(
     "标准 9×10 中国象棋，红方先手，目标是将死或困毙对方的将帅。",
@@ -286,16 +286,15 @@ private fun XiangqiBoard(
                 val verticalPadding = size.height * 0.055f
                 val cellX = (size.width - horizontalPadding * 2f) / 8f
                 val cellY = (size.height - verticalPadding * 2f) / 9f
-                val screenColumn = ((offset.x - horizontalPadding) / cellX).toInt()
-                val screenRow = ((offset.y - verticalPadding) / cellY).toInt()
-                if (screenColumn !in 0..8 || screenRow !in 0..9) return@detectTapGestures
-                val center = Offset(
-                    horizontalPadding + screenColumn * cellX,
-                    verticalPadding + screenRow * cellY,
-                )
-                if (hypot(offset.x - center.x, offset.y - center.y) > min(cellX, cellY) * 0.58f) {
-                    return@detectTapGestures
-                }
+                // 以整格为命中区域，选择离触点最近的交叉点。
+                // 手机上单格通常约 48dp，边缘和棋子外圈也能稳定点中。
+                val minX = horizontalPadding - cellX * 0.55f
+                val maxX = horizontalPadding + 8f * cellX + cellX * 0.55f
+                val minY = verticalPadding - cellY * 0.55f
+                val maxY = verticalPadding + 9f * cellY + cellY * 0.55f
+                if (offset.x !in minX..maxX || offset.y !in minY..maxY) return@detectTapGestures
+                val screenColumn = ((offset.x - horizontalPadding) / cellX).roundToInt().coerceIn(0, 8)
+                val screenRow = ((offset.y - verticalPadding) / cellY).roundToInt().coerceIn(0, 9)
                 val row = if (flipped) 9 - screenRow else screenRow
                 val column = if (flipped) 8 - screenColumn else screenColumn
                 onPointTap(XiangqiPoint(row, column))
